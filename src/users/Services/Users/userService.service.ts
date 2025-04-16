@@ -17,7 +17,7 @@ export class UserService {
   async getMe(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'name', 'email', 'phone', 'age', 'address', 'role'],
+      select: ['id', 'name', 'email', 'phone', 'age', 'address', 'role', 'image'],
     });
     if (!user) {
       throw new NotFoundException('user not found');
