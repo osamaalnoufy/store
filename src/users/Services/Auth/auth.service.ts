@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Users } from 'src/entities/users.entity';
 import { SignUp } from 'src/users/Dtos/Auth/authDto.dto';
@@ -22,7 +23,7 @@ export class AuthService {
   constructor(
     private dataSource: DataSource,
     private mailService: MailService,
-    private jwtServicev: JwtService,
+    private jwtService: JwtService,
     @InjectRepository(Users)
     private userRepository: Repository<Users>,
     @InjectRepository(Tokens)
@@ -52,7 +53,7 @@ export class AuthService {
       role: admin.role,
     };
     const token = {
-      access_token: await this.jwtServicev.signAsync(admin_info),
+      access_token: await this.jwtService.signAsync(admin_info),
     };
     return {
       admin_info,
@@ -122,12 +123,19 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
-    const token = await this.jwtServicev.signAsync(payload, {
+    const token = await this.jwtService.signAsync(payload, {
       secret: `${process.env.JWT_SECRET}`,
     });
+    const refresh_token = await this.jwtService.signAsync(
+      { ...payload, countEx: 5 },
+      { secret: process.env.JWT_SECRET_REFRESHTOKEN, expiresIn: '7d' },
+    );
     return {
+      status: 200,
+      message: 'user logged in successfully',
       data: user,
       access_token: token,
+      refresh_token: refresh_token,
     };
   }
   async verifyTheEmail(token: string): Promise<{ message: string }> {
@@ -174,7 +182,7 @@ export class AuthService {
       });
       if (!user) {
         const nextId = await this.findNextAvailableId();
-        const newUser = queryRunner.manager.create(Users,{
+        const newUser = queryRunner.manager.create(Users, {
           id: nextId,
           email: userDate.email,
           name: userDate.name,
@@ -204,14 +212,21 @@ export class AuthService {
           email: newUser.email,
           role: newUser.role,
         };
-        const tokenjwt = await this.jwtServicev.signAsync(payload, {
+        const tokenjwt = await this.jwtService.signAsync(payload, {
           secret: `${process.env.JWT_SECRET}`,
         });
+        const refresh_token = await this.jwtService.signAsync(
+          { ...payload, countEx: 5 },
+          { secret: process.env.JWT_SECRET_REFRESHTOKEN, expiresIn: '7d' },
+        );
         const { password, ...result } = newUser;
         await queryRunner.commitTransaction();
         return {
-          data: result,
-          access_token: tokenjwt,
+          status: 200,
+          message: 'user logged in successfully',
+          data: user,
+          access_token: token,
+          refresh_token: refresh_token,
         };
       } else {
         const payload2 = {
@@ -219,14 +234,21 @@ export class AuthService {
           email: user.email,
           role: user.role,
         };
-        const tokenjwt = await this.jwtServicev.signAsync(payload2, {
+        const tokenjwt = await this.jwtService.signAsync(payload2, {
           secret: `${process.env.JWT_SECRET}`,
         });
+        const refresh_token = await this.jwtService.signAsync(
+          { ...payload2, countEx: 5 },
+          { secret: process.env.JWT_SECRET_REFRESHTOKEN, expiresIn: '7d' },
+        );
         const { password, ...result } = user;
         await queryRunner.commitTransaction();
         return {
-          data: result,
+          status: 200,
+          message: 'user logged in successfully',
+          data: user,
           access_token: tokenjwt,
+          refresh_token: refresh_token,
         };
       }
     } catch (err) {
@@ -236,6 +258,64 @@ export class AuthService {
       throw err;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: process.env.JWT_SECRET_REFRESHTOKEN,
+      });
+
+      if (!payload || payload.countEx <= 0) {
+        throw new UnauthorizedException(
+          'Invalid refresh token,please go to login again',
+        );
+      }
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < currentTimestamp) {
+        throw new UnauthorizedException(
+          'Refresh token has expired, please login again',
+        );
+      }
+      const { exp, countEx, ...newPayload } = payload;
+      const newPayoadForAccessToken = {
+        id: newPayload.id,
+        email: newPayload.email,
+        role: newPayload.role,
+      };
+      const access_token = await this.jwtService.signAsync(
+        newPayoadForAccessToken,
+        {
+          secret: process.env.JWT_SECRET,
+        },
+      );
+      const newCountEx = countEx - 1;
+      const refresh_token = await this.jwtService.signAsync(
+        { ...newPayload, countEx: newCountEx },
+        {
+          secret: process.env.JWT_SECRET_REFRESHTOKEN,
+          expiresIn: '7d',
+        },
+      );
+      return {
+        status: 200,
+        message: 'Refresh Access token successfully',
+        access_token,
+        refresh_token,
+      };
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException(
+          'Refresh token has expired, please login again',
+        );
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException(
+          'Invalid refresh token, please login again',
+        );
+      }
+      throw error;
     }
   }
 }

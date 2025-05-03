@@ -50,4 +50,8 @@ export class AuthController {
   async callbackSign(user: any) {
     return await this.authService.validateUserByGoogle(user);
   }
+  @Post('refresh-token')
+  async refreshToken(@Body() refresh_token: string) {
+    return await this.authService.refreshToken(refresh_token);
+  }
 }

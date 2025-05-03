@@ -6,6 +6,7 @@ import * as dotenv from 'dotenv';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/module/user.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { ProductModule } from './product/product.module';
 dotenv.config();
 @Module({
   imports: [
@@ -28,6 +29,7 @@ dotenv.config();
     }),
     UsersModule,
     CloudinaryModule,
+    ProductModule,
   ],
   controllers: [AppController],
   providers: [AppService],
