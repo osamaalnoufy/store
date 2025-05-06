@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
-  Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { SubCategoryService } from './sub-category.service';
@@ -27,6 +28,12 @@ export class SubCategoryController {
   @Roles(['admin', 'user'])
   @UseGuards(UsersGuard)
   async findAllSubCategory(@Body() body: { category_id: number }) {
+    let categoryId = body.category_id;
+    if (!categoryId) {
+      throw new BadRequestException(
+        'category_id is missing in the request body',
+      );
+    }
     return await this.subCategoryService.findAllSubCategory(body.category_id);
   }
   @Get('find/:id')
@@ -41,7 +48,7 @@ export class SubCategoryController {
   async deleteSubCategory(@Param('id') id: number) {
     return await this.subCategoryService.deleteSubCategory(id);
   }
-  @Patch('update/:id')
+  @Put('update/:id')
   @Roles(['admin'])
   @UseGuards(UsersGuard)
   async updateSubCategory(
@@ -51,7 +58,6 @@ export class SubCategoryController {
   ) {
     return await this.subCategoryService.updateSubCategory(
       id,
-
       updateBrandDto.name,
     );
   }

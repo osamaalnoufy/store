@@ -7,6 +7,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/module/user.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { ProductModule } from './product/product.module';
+import { SubCategoryModule } from './sub-category/sub-category.module';
+import { CategoryModule } from './category/category.module';
+import { BrandModule } from './brand/brand.module';
+import { RequestProductModule } from './request-product/request-product.module';
+import { CouponModule } from './coupon/coupon.module';
 dotenv.config();
 @Module({
   imports: [
@@ -30,6 +35,11 @@ dotenv.config();
     UsersModule,
     CloudinaryModule,
     ProductModule,
+    SubCategoryModule,
+    CategoryModule,
+    BrandModule,
+    RequestProductModule,
+    CouponModule,
   ],
   controllers: [AppController],
   providers: [AppService],

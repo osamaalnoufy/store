@@ -25,22 +25,26 @@ export class BrandService {
     if (!category_id) {
       throw new HttpException('category not found', 400);
     }
-    const newBrand = this.brandRepository.create({
-      name: nameBrand,
-      image: imageBrand,
-      category: { id: categoryId },
-    });
-    await this.brandRepository.save(newBrand);
-    return {
-      status: 200,
-      message: 'brand created successfully',
-      date: {
-        id: newBrand.id,
-        name: newBrand.name,
-        image: newBrand.image,
-        category_id: newBrand.category.id,
-      },
-    };
+    try {
+      const newBrand = this.brandRepository.create({
+        name: nameBrand,
+        image: imageBrand,
+        category: { id: categoryId },
+      });
+      await this.brandRepository.save(newBrand);
+      return {
+        status: 201,
+        message: 'brand created successfully',
+        date: {
+          id: newBrand.id,
+          name: newBrand.name,
+          image: newBrand.image,
+          category_id: newBrand.category.id,
+        },
+      };
+    } catch (error) {
+      throw new HttpException('Failed to create brand', 500);
+    }
   }
   async findAllBrand(categoryId: number) {
     const brand = await this.brandRepository.find({

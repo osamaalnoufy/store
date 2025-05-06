@@ -1,6 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { Brand } from './brand.entity';
 import { SubCategory } from './sub-category.entity';
+import { Product } from './product.entity';
 
 @Entity('category')
 export class Category {
@@ -29,4 +30,7 @@ export class Category {
     cascade: true,
   })
   subCategorys: SubCategory[];
+
+  @OneToMany(() => Product, (product) => product.category, { cascade: true })
+  products: Product[];
 }

@@ -26,20 +26,24 @@ export class SubCategoryService {
     if (!category) {
       throw new NotFoundException('category not found');
     }
-    const newSubCategory = this.subCategorRepository.create({
-      name: subCategoryDto.name,
-      category: { id: subCategoryDto.categoryID },
-    });
-    await this.subCategorRepository.save(newSubCategory);
-    return {
-      status: 200,
-      message: 'sub category created successfully',
-      date: {
-        id: newSubCategory.id,
-        name: newSubCategory.name,
-        category_id: newSubCategory.category.id,
-      },
-    };
+    try {
+      const newSubCategory = this.subCategorRepository.create({
+        name: subCategoryDto.name,
+        category: { id: subCategoryDto.categoryID },
+      });
+      await this.subCategorRepository.save(newSubCategory);
+      return {
+        status: 201,
+        message: 'sub category created successfully',
+        date: {
+          id: newSubCategory.id,
+          name: newSubCategory.name,
+          category_id: newSubCategory.category.id,
+        },
+      };
+    } catch (error) {
+      throw new HttpException('Failed to create sup-category', 500);
+    }
   }
 
   async findAllSubCategory(categoryId: number) {

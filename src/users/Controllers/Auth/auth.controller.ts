@@ -51,7 +51,7 @@ export class AuthController {
     return await this.authService.validateUserByGoogle(user);
   }
   @Post('refresh-token')
-  async refreshToken(@Body() refresh_token: string) {
-    return await this.authService.refreshToken(refresh_token);
+  async refreshToken(@Body() body: { refresh_token: string }) {
+    return await this.authService.refreshToken(body.refresh_token);
   }
 }

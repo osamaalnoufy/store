@@ -1,34 +1,82 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  HttpException,
+  Query,
+} from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { Roles } from 'src/users/Guards/roles.decorator';
+import { UsersGuard } from 'src/users/Guards/users.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Controller('product')
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(
+    private readonly productService: ProductService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
-  @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productService.create(createProductDto);
+  @Post('create')
+  @Roles(['admin'])
+  @UseGuards(UsersGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  async createProduct(
+    @UploadedFile() image: Express.Multer.File,
+    @Body() createProductDto: CreateProductDto,
+  ) {
+    const imageProduct = await this.cloudinaryService.uploadFile(image);
+    return await this.productService.createProduct(
+      createProductDto,
+      imageProduct,
+    );
   }
 
   @Get()
-  findAll() {
-    return this.productService.findAll();
+  async findAllProduct(@Query() query) {
+    return this.productService.findAllProduct(query);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productService.findOne(+id);
+  @Get('find/:id')
+  @Roles(['admin', 'user'])
+  @UseGuards(UsersGuard)
+  async findOneProduct(@Param('id') id: number) {
+    return await this.productService.findOneProduct(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productService.update(+id, updateProductDto);
+  @Patch('update/:id')
+  @Roles(['admin'])
+  @UseGuards(UsersGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  async updateProduct(
+    @Param('id') id: number,
+    @UploadedFile() image: Express.Multer.File,
+    @Body() updateProductDto: UpdateProductDto,
+  ) {
+    let imageProduct = image
+      ? await this.cloudinaryService.uploadFile(image)
+      : null;
+    return await this.productService.updateProduct(
+      id,
+      updateProductDto,
+      imageProduct,
+    );
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productService.remove(+id);
+  @Delete('delete/:id')
+  @Roles(['admin'])
+  @UseGuards(UsersGuard)
+  async removeProduct(@Param('id') id: number) {
+    return await this.productService.removeProduct(id);
   }
 }

@@ -266,7 +266,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: process.env.JWT_SECRET_REFRESHTOKEN,
       });
-
+      console.log(payload);
       if (!payload || payload.countEx <= 0) {
         throw new UnauthorizedException(
           'Invalid refresh token,please go to login again',
@@ -299,7 +299,7 @@ export class AuthService {
         },
       );
       return {
-        status: 200,
+        status: 201,
         message: 'Refresh Access token successfully',
         access_token,
         refresh_token,

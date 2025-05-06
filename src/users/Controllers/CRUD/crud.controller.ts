@@ -9,6 +9,7 @@ import {
   Request,
   Patch,
 } from '@nestjs/common';
+import { UpdateAdminDto } from 'src/users/Dtos/Admin/updateAdminDto.dto';
 import { UpdateUserDto } from 'src/users/Dtos/Users/updateUserDto.dto';
 import { Roles } from 'src/users/Guards/roles.decorator';
 import { UsersGuard } from 'src/users/Guards/users.guard';
@@ -24,7 +25,7 @@ export class CrudController {
   @Get('all/users')
   @Roles(['admin'])
   @UseGuards(UsersGuard)
-  async findAllUsers(@Query() query) {
+  async findAllUsers(@Query() query: any) {
     return await this.adminService.findAllUsers(query);
   }
   @Get(':id')
@@ -56,11 +57,11 @@ export class CrudController {
   async updateMe(
     @Request() req,
     @Body() updateUserDto: UpdateUserDto,
-    @Body() body: { email: string },
+    @Body() updateAdminDto:UpdateAdminDto,
   ) {
     const { role, id } = req.user;
     if (role === 'admin') {
-      return await this.adminService.update(id, body.email);
+      return await this.adminService.update(id, updateAdminDto.email);
     } else if (role === 'user') {
       return await this.userService.update(id, updateUserDto);
     }

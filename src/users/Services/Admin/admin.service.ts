@@ -2,6 +2,7 @@ import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Admin } from 'src/entities/admin.entity';
 import { Users } from 'src/entities/users.entity';
+import { UpdateAdminDto } from 'src/users/Dtos/Admin/updateAdminDto.dto';
 import { SignUp } from 'src/users/Dtos/Auth/authDto.dto';
 import { Like, Repository } from 'typeorm';
 
@@ -52,7 +53,7 @@ export class AdminService {
       select: ['id', 'name', 'email', 'role', 'age', 'address', 'phone'],
     });
 
-    return  {
+    return {
       status: 200,
       message: 'users retrieeved success fully',
       length: users.length,

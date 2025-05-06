@@ -16,16 +16,20 @@ export class CategoryService {
     if (category) {
       throw new HttpException('Category already exist', 400);
     }
-    const newCategory = this.categoryRepository.create({
-      name: nameCategory,
-      image: imageCategory,
-    });
-    await this.categoryRepository.save(newCategory);
-    return {
-      status: 200,
-      message: 'Category created successfully',
-      date: newCategory,
-    };
+    try {
+      const newCategory = this.categoryRepository.create({
+        name: nameCategory,
+        image: imageCategory,
+      });
+      await this.categoryRepository.save(newCategory);
+      return {
+        status: 201,
+        message: 'Category created successfully',
+        date: newCategory,
+      };
+    } catch (error) {
+      throw new HttpException('Failed to create category', 500);
+    }
   }
   async updateCategory(id: number, imageCategory: string, name: string) {
     const category = await this.categoryRepository.findOne({
