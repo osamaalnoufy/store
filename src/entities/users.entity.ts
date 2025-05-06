@@ -10,6 +10,7 @@ import {
 import { Tokens } from './tokens.entity';
 import { ResetToken } from './resetToken.entity';
 import * as bcrypt from 'bcrypt';
+import { RequestProduct } from './request-product.entity';
 @Entity('users')
 export class Users {
   @PrimaryColumn('int')
@@ -59,4 +60,10 @@ export class Users {
     cascade: true,
   })
   resetTokens: ResetToken[];
+
+  @OneToMany(() => RequestProduct, (requestProduct) => requestProduct.user, {
+    eager: false,
+    cascade: true,
+  })
+  requestProducts: RequestProduct[];
 }

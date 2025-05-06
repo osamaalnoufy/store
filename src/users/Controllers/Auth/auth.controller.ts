@@ -27,7 +27,7 @@ export class AuthController {
   }
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req) {
+  async login(@Request() req: any) {
     return await this.authService.login(req.user);
   }
   @Post('verify-the-email')

@@ -80,7 +80,7 @@ export class ProductService {
       return {
         status: 201,
         message: 'product created successfully',
-        date: {
+        data: {
           id: newProduct.id,
           name: newProduct.name,
           image: newProduct.image,
@@ -98,17 +98,9 @@ export class ProductService {
     }
   }
 
-  async findAllProduct(query: any) {
-    let requestQuery = { ...query };
-    const removeQuery = [
-      'page',
-      'limit',
-      'sort',
-      'keyword',
-      'categoty',
-      'fields',
-    ];
-  }
+  // async findAllProduct(query: any) {
+ 
+  // }
 
   async findOneProduct(id: number) {
     const product = await this.productRepository.findOne({
@@ -201,6 +193,7 @@ export class ProductService {
         : product.brand,
       image: imageProduct || product.image,
     };
+    await this.productRepository.save(updatedProduct);
     return {
       status: 200,
       message: 'Product Updated successfully',

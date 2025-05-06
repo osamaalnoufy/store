@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { RequestProductService } from './request-product.service';
 import { CreateRequestProductDto } from './dto/create-request-product.dto';
@@ -18,33 +19,50 @@ import { UsersGuard } from 'src/users/Guards/users.guard';
 export class RequestProductController {
   constructor(private readonly requestProductService: RequestProductService) {}
 
-  @Post()
+  @Post('create')
   @Roles(['user'])
   @UseGuards(UsersGuard)
-  create(@Body() createRequestProductDto: CreateRequestProductDto) {
-    return this.requestProductService.create(createRequestProductDto);
+  async create(
+    @Request() req: any,
+    @Body() createRequestProductDto: CreateRequestProductDto,
+  ) {
+    const { id } = req.user;
+    return await this.requestProductService.create(id, createRequestProductDto);
   }
 
-  @Get()
-  findAll() {
-    return this.requestProductService.findAll();
+  @Get('find/all')
+  @Roles(['admin'])
+  @UseGuards(UsersGuard)
+  async findAll() {
+    return await this.requestProductService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.requestProductService.findOne(+id);
+  @Get('find/:id')
+  @Roles(['admin', 'user'])
+  @UseGuards(UsersGuard)
+  async findOne(@Param('id') id: number) {
+    return await this.requestProductService.findOne(id);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
+  @Patch('update/:id')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
+  async update(
+    @Request() req: any,
+    @Param('id') id: number,
     @Body() updateRequestProductDto: UpdateRequestProductDto,
   ) {
-    return this.requestProductService.update(+id, updateRequestProductDto);
+    return await this.requestProductService.update(
+      id,
+      updateRequestProductDto,
+      req.user.id,
+    );
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.requestProductService.remove(+id);
+  @Delete('delete/:id')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
+  async remove(@Param('id') id: number) {
+    return await this.requestProductService.remove(id);
   }
 }

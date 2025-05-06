@@ -15,7 +15,7 @@ import {
     details: string;
     @IsNumber({}, { message: 'qauntity must be a number' })
     @Min(1, { message: 'Qauntity must be at least 1 product' })
-    qauntity: number;
+    quantity: number;
     @IsOptional()
     @IsString({ message: 'category must be a string' })
     category: string;

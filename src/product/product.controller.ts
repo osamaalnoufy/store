@@ -42,10 +42,10 @@ export class ProductController {
     );
   }
 
-  @Get()
-  async findAllProduct(@Query() query) {
-    return this.productService.findAllProduct(query);
-  }
+  // @Get()
+  // async findAllProduct(@Query() query) {
+  //   return this.productService.findAllProduct(query);
+  // }
 
   @Get('find/:id')
   @Roles(['admin', 'user'])
