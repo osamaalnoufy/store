@@ -51,12 +51,16 @@ export class BrandService {
       where: { category: { id: categoryId } },
       select: ['id', 'name', 'image'],
     });
+    const category = await this.categoryRepository.findOne({
+      where: { id: categoryId },
+    });
     return {
       status: 200,
       message: 'brand found',
       length: brand.length,
       isEmpty: brand.length > 0 ? 'false' : 'true',
       category_id: categoryId,
+      category_name: category.name,
       date: brand,
     };
   }

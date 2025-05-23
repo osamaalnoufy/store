@@ -6,7 +6,7 @@ import { RequestProduct } from 'src/entities/request-product.entity';
 import { Users } from 'src/entities/users.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RequestProduct,Users])],
+  imports: [TypeOrmModule.forFeature([RequestProduct, Users])],
   controllers: [RequestProductController],
   providers: [RequestProductService],
 })

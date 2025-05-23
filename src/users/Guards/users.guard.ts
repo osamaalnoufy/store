@@ -53,8 +53,7 @@ export class UsersGuard implements CanActivate {
       ) {
         throw new UnauthorizedException();
       }
-      // 💡 We're assigning the payload to the request object here
-      // so that we can access it in our route handlers
+
       request['user'] = payload;
     } catch {
       throw new UnauthorizedException();

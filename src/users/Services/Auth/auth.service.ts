@@ -77,7 +77,7 @@ export class AuthService {
       }
       const nextId = await this.findNextAvailableId();
       const newUser = queryRunner.manager.create(Users, {
-        id: nextId,
+        id: nextId, 
         name: signUp.name,
         email: signUp.email,
         phone: signUp.phone,
