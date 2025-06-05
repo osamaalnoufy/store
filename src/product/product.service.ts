@@ -37,7 +37,6 @@ export class ProductService {
     if (!category) {
       throw new HttpException('This Category not Exist', 400);
     }
-    let subcategory = null;
     if (createProductDto.subCategoryID) {
       const subCategory = await this.subCategorRepository.findOne({
         where: { id: createProductDto.subCategoryID },
