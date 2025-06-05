@@ -37,18 +37,19 @@ export class ProductService {
     if (!category) {
       throw new HttpException('This Category not Exist', 400);
     }
-    let subcategory = null;
+    let subCategory = null;
     if (createProductDto.subCategoryID) {
-      const subCategory = await this.subCategorRepository.findOne({
+      subCategory = await this.subCategorRepository.findOne({
         where: { id: createProductDto.subCategoryID },
       });
+
       if (!subCategory) {
         throw new HttpException('This Sub Category not Exist', 400);
       }
     }
     let brand = null;
     if (createProductDto.brandID) {
-      const brand = await this.brandRepository.findOne({
+      brand = await this.brandRepository.findOne({
         where: { id: createProductDto.brandID },
       });
       if (!brand) {
@@ -71,7 +72,7 @@ export class ProductService {
         price: createProductDto.price,
         price_after_discount: createProductDto.priceAfterDiscount || null,
         category: { id: createProductDto.categoryID },
-        subcategory: subcategory
+        subcategory: subCategory
           ? { id: createProductDto.subCategoryID }
           : null,
         brand: brand ? { id: createProductDto.brandID } : null,
@@ -99,7 +100,7 @@ export class ProductService {
   }
 
   // async findAllProduct(query: any) {
- 
+
   // }
 
   async findOneProduct(id: number) {
