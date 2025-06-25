@@ -15,6 +15,7 @@ import { CouponModule } from './coupon/coupon.module';
 import { CartModule } from './cart/cart.module';
 import { TaxModule } from './tax/tax.module';
 import { ReviewModule } from './review/review.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
 dotenv.config();
 @Module({
   imports: [
@@ -46,6 +47,7 @@ dotenv.config();
     CartModule,
     TaxModule,
     ReviewModule,
+    SuppliersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
