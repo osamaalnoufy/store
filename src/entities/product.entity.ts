@@ -3,11 +3,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Category } from './category.entity';
 import { SubCategory } from './sub-category.entity';
 import { Brand } from './brand.entity';
+import { Review } from './review.entity';
 
 @Entity('product')
 export class Product {
@@ -26,6 +28,19 @@ export class Product {
   price: number;
   @Column()
   price_after_discount: number;
+
+  @Column({
+    name: 'ratings_average',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0,
+  })
+  ratings_average: number;
+
+  @Column({ name: 'ratings_quantity', default: 0 })
+  ratings_quantity: number;
+
   @ManyToOne(() => Category, (category) => category.products)
   @JoinColumn({ name: 'category_id' })
   category: Category;
@@ -37,4 +52,7 @@ export class Product {
   @ManyToOne(() => Brand, (brand) => brand.products, { nullable: true })
   @JoinColumn({ name: 'brand_id' })
   brand: Brand | null;
+
+  @OneToMany(() => Review, (review) => review.product)
+  reviews: Review[];
 }

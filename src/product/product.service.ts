@@ -99,9 +99,58 @@ export class ProductService {
     }
   }
 
-  // async findAllProduct(query: any) {
+  async findAllProduct(filter: {
+    category: number;
+    subcategory?: number;
+    brand?: number;
+  }) {
+    const categoryExists = await this.productRepository.manager
+      .getRepository(Category)
+      .count({ where: { id: filter.category } });
 
-  // }
+    if (!categoryExists) {
+      throw new NotFoundException('الفئة الرئيسية غير موجودة');
+    }
+
+    const queryBuilder = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.subcategory', 'subcategory')
+      .leftJoinAndSelect('product.brand', 'brand')
+      .where('product.category_id = :categoryId', {
+        categoryId: filter.category,
+      });
+
+    if (filter.subcategory) {
+      const subcategoryExists = await this.productRepository.manager
+        .getRepository(SubCategory)
+        .count({ where: { id: filter.subcategory } });
+
+      if (!subcategoryExists) {
+        throw new NotFoundException('الفئة الفرعية غير موجودة');
+      }
+
+      queryBuilder.andWhere('product.sub_category_id = :subcategoryId', {
+        subcategoryId: filter.subcategory,
+      });
+    }
+
+    if (filter.brand) {
+      const brandExists = await this.productRepository.manager
+        .getRepository(Brand)
+        .count({ where: { id: filter.brand } });
+
+      if (!brandExists) {
+        throw new NotFoundException('البراند غير موجود');
+      }
+
+      queryBuilder.andWhere('product.brand_id = :brandId', {
+        brandId: filter.brand,
+      });
+    }
+
+    return queryBuilder.getMany();
+  }
 
   async findOneProduct(id: number) {
     const product = await this.productRepository.findOne({

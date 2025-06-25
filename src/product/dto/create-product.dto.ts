@@ -1,11 +1,8 @@
 import { Transform } from 'class-transformer';
 import {
-  IsArray,
-  IsMongoId,
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   Max,
   Min,
   MinLength,

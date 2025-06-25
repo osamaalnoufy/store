@@ -11,6 +11,8 @@ import { Tokens } from './tokens.entity';
 import { ResetToken } from './resetToken.entity';
 import * as bcrypt from 'bcrypt';
 import { RequestProduct } from './request-product.entity';
+import { Cart } from './cart.entity';
+import { Review } from './review.entity';
 @Entity('users')
 export class Users {
   @PrimaryColumn('int')
@@ -66,4 +68,13 @@ export class Users {
     cascade: true,
   })
   requestProducts: RequestProduct[];
+
+  @OneToMany(() => Cart, (cart) => cart.user, {
+    eager: false,
+    cascade: true, // سيحذف الكارت تلقائياً عند حذف المستخدم
+  })
+  carts: Cart[];
+
+  @OneToMany(() => Review, (review) => review.user)
+  reviews: Review[];
 }

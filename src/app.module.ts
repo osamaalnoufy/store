@@ -12,6 +12,9 @@ import { CategoryModule } from './category/category.module';
 import { BrandModule } from './brand/brand.module';
 import { RequestProductModule } from './request-product/request-product.module';
 import { CouponModule } from './coupon/coupon.module';
+import { CartModule } from './cart/cart.module';
+import { TaxModule } from './tax/tax.module';
+import { ReviewModule } from './review/review.module';
 dotenv.config();
 @Module({
   imports: [
@@ -40,6 +43,9 @@ dotenv.config();
     BrandModule,
     RequestProductModule,
     CouponModule,
+    CartModule,
+    TaxModule,
+    ReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
