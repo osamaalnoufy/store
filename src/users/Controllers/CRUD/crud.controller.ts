@@ -56,14 +56,16 @@ export class CrudController {
   @UseGuards(UsersGuard)
   async updateMe(
     @Request() req,
-    @Body() updateUserDto: UpdateUserDto,
-    @Body() updateAdminDto:UpdateAdminDto,
+    @Body() updateDto: UpdateUserDto | UpdateAdminDto,
   ) {
     const { role, id } = req.user;
-    if (role === 'admin') {
-      return await this.adminService.update(id, updateAdminDto.email);
-    } else if (role === 'user') {
-      return await this.userService.update(id, updateUserDto);
+    if (role === 'user') {
+      return await this.userService.update(id, updateDto as UpdateUserDto);
+    } else if (role === 'admin') {
+      return await this.adminService.update(
+        id,
+        (updateDto as UpdateAdminDto).email,
+      );
     }
   }
 
