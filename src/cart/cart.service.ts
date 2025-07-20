@@ -579,6 +579,7 @@ export class CartService {
                   id: product.id,
                   name: product.name,
                   description: product.description,
+                  image:product.image,
                   price: product.price,
                   price_after_discount: product.price_after_discount,
                 }

@@ -14,12 +14,15 @@ export class Cart {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column('jsonb', { nullable: true })
+  @Column('jsonb', { nullable: true, default: [] })
   cartitems: Array<{
     productId: number;
     quantity: number;
     product?: {
       id: number;
+      name: string;
+      description: string;
+      image: string;
       price: number;
       price_after_discount: number;
     };

@@ -24,10 +24,12 @@ export class Product {
   description: string;
   @Column()
   quantity: number;
-  @Column()
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
-  @Column()
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price_after_discount: number;
+  @Column({ default: 0 })
+  sold: number;
 
   @Column({
     name: 'ratings_average',

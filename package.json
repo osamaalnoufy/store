@@ -34,7 +34,7 @@
     "class-validator": "^0.14.1",
     "cloudinary": "^2.6.0",
     "fix-esm": "^1.0.1",
-    "multer": "^1.4.5-lts.2",
+    "multer": "^2.0.1",
     "nanoid": "^5.0.7",
     "nestjs-i18n": "^10.5.1",
     "nodemailer": "^6.9.15",
@@ -45,9 +45,11 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pg": "^8.13.1",
+    "raw-body": "^3.0.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "streamifier": "^0.1.1",
+    "stripe": "^18.3.0",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
@@ -65,6 +67,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/streamifier": "^0.1.2",
+    "@types/stripe": "^8.0.416",
     "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

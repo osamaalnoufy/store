@@ -40,10 +40,12 @@ export class Coupon {
   expire_date: Date;
 
   @Column({
-    type: 'int',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
     nullable: false,
   })
-  @IsInt()
   discount: number;
 
   @CreateDateColumn()

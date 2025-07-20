@@ -5,7 +5,6 @@ import {
   Index,
   OneToMany,
   PrimaryColumn,
-  Unique,
 } from 'typeorm';
 import { Tokens } from './tokens.entity';
 import { ResetToken } from './resetToken.entity';
@@ -13,6 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { RequestProduct } from './request-product.entity';
 import { Cart } from './cart.entity';
 import { Review } from './review.entity';
+import { Order } from './order.entity';
 @Entity('users')
 export class Users {
   @PrimaryColumn('int')
@@ -71,10 +71,16 @@ export class Users {
 
   @OneToMany(() => Cart, (cart) => cart.user, {
     eager: false,
-    cascade: true, // سيحذف الكارت تلقائياً عند حذف المستخدم
+    cascade: true,
   })
   carts: Cart[];
 
   @OneToMany(() => Review, (review) => review.user)
   reviews: Review[];
+
+  @OneToMany(() => Order, (order) => order.user, {
+    eager: false,
+    cascade: true,
+  })
+  orders: Order[];
 }
