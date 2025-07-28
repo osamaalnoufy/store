@@ -60,4 +60,11 @@ export class CouponController {
   async removeCoupon(@Param('id') id: number) {
     return await this.couponService.removeCoupon(id);
   }
+
+  @Get('find')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
+  async findActiveCoupons() {
+    return await this.couponService.findActiveCoupons();
+  }
 }

@@ -82,4 +82,18 @@ export class ProductController {
   async removeProduct(@Param('id') id: number) {
     return await this.productService.removeProduct(id);
   }
+
+  @Get('top-selling')
+  @Roles(['admin', 'user'])
+  @UseGuards(UsersGuard)
+  async getTopSelling() {
+    return await this.productService.getTopSellingProducts();
+  }
+
+  @Get('newest')
+  @Roles(['admin', 'user'])
+  @UseGuards(UsersGuard)
+  async getNewestProducts() {
+    return await this.productService.getNewestProducts();
+  }
 }

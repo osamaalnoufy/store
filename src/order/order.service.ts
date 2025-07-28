@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -374,5 +375,73 @@ export class OrderService {
       length: orders.length,
       data: orders,
     };
+  }
+
+  async reorder(userId: number, orderId: number): Promise<Cart> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, user: { id: userId } },
+      relations: ['user'],
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const existingCart = await this.cartRepository.findOne({
+      where: { user: { id: userId } },
+    });
+
+    if (existingCart) {
+      throw new ConflictException(
+        'User already has an existing cart. Please clear it before reordering.',
+      );
+    }
+
+    const cart = this.cartRepository.create({
+      user: { id: userId },
+      cartitems: [],
+      total_price: 0,
+      total_price_after_discount: 0,
+      coupons: null,
+    });
+
+    let totalPrice = 0;
+    let totalPriceAfterDiscount = 0;
+
+    cart.cartitems = order.cart_items.map((item) => {
+      const itemPrice = parseFloat(item.product?.price?.toString() || '0');
+      const itemDiscountedPrice =
+        item.product?.price_after_discount !== null
+          ? parseFloat(item.product.price_after_discount.toString())
+          : itemPrice;
+
+      totalPrice += itemPrice * item.quantity;
+      totalPriceAfterDiscount += itemDiscountedPrice * item.quantity;
+
+      return {
+        
+       
+        productId: item.productId,
+        quantity: item.quantity,
+        product: item.product
+          ? {
+              id: item.product.id,
+              name: item.product.name || null,
+              image: item.product.image || null,
+              description: item.product.description || null,
+              price: itemPrice,
+              price_after_discount:
+                item.product.price_after_discount !== null
+                  ? itemDiscountedPrice
+                  : null,
+            }
+          : null,
+      };
+    });
+
+    cart.total_price = totalPrice;
+    cart.total_price_after_discount = totalPriceAfterDiscount;
+
+    return await this.cartRepository.save(cart);
   }
 }

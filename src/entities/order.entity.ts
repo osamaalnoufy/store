@@ -31,6 +31,9 @@ export class Order {
     color: string;
     product?: {
       id: number;
+      name: string; 
+      image: string; 
+      description: string; 
       price: number;
       price_after_discount: number;
     };

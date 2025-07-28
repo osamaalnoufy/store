@@ -92,6 +92,8 @@ export class ProductService {
           category_id: newProduct.category.id,
           subcategory_id: newProduct.subcategory?.id || null,
           brand_id: newProduct.brand?.id || null,
+          create_at: newProduct.created_at,
+          update_at: newProduct.updated_at,
         },
       };
     } catch (error) {
@@ -167,13 +169,18 @@ export class ProductService {
         id: product.id,
         name: product.name,
         image: product.image,
-        quantity: product.quantity,
         description: product.description,
         price: product.price,
-        priceAfterDiscount: product.price_after_discount,
-        category_id: product.category?.id,
-        subcategory_id: product.subcategory?.id || null,
-        brand_id: product.brand?.id || null,
+        price_after_discount: product.price_after_discount,
+        quantity: product.quantity,
+        sold: product.sold,
+        category: product.category?.name,
+        subcategory: product.subcategory?.name,
+        brand: product.brand?.name,
+        ratings_average: product.ratings_average,
+        ratings_quantity: product.ratings_quantity,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
       },
     };
   }
@@ -258,6 +265,8 @@ export class ProductService {
         category_id: updatedProduct.category?.id,
         subcategory_id: updatedProduct.subcategory?.id || null,
         brand_id: updatedProduct.brand?.id || null,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
       },
     };
   }
@@ -271,6 +280,70 @@ export class ProductService {
     return {
       date: 200,
       message: 'product deleted successfully',
+    };
+  }
+
+  async getTopSellingProducts() {
+    const topSelling = await this.productRepository.find({
+      order: {
+        sold: 'DESC',
+      },
+      take: 3,
+      relations: ['category', 'subcategory', 'brand'],
+    });
+
+    return {
+      status: 200,
+      message: 'Top selling products retrieved successfully',
+      data: topSelling.map((product) => ({
+        id: product.id,
+        name: product.name,
+        image: product.image,
+        description: product.description,
+        price: product.price,
+        price_after_discount: product.price_after_discount,
+        quantity: product.quantity,
+        sold: product.sold,
+        category: product.category?.name,
+        subcategory: product.subcategory?.name,
+        brand: product.brand?.name,
+        ratings_average: product.ratings_average,
+        ratings_quantity: product.ratings_quantity,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
+      })),
+    };
+  }
+
+  async getNewestProducts() {
+    const newestProducts = await this.productRepository.find({
+      order: {
+        created_at: 'DESC',
+      },
+      take: 3,
+      relations: ['category', 'subcategory', 'brand'],
+    });
+
+    return {
+      status: 200,
+      message: 'Newest products retrieved successfully',
+      data: newestProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        image: product.image,
+        description: product.description,
+        price: product.price,
+        price_after_discount: product.price_after_discount,
+        quantity: product.quantity,
+        sold: product.sold,
+        category: product.category?.name,
+        subcategory: product.subcategory?.name,
+        brand: product.brand?.name,
+        ratings_average: product.ratings_average,
+        ratings_quantity: product.ratings_quantity,
+        created_at: product.created_at,
+        updated_at: product.updated_at,
+      })),
     };
   }
 }

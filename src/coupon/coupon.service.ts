@@ -109,4 +109,19 @@ export class CouponService {
       message: 'coupon deleted successfully',
     };
   }
+  async findActiveCoupons() {
+    const currentDate = new Date();
+    const activeCoupons = await this.couponRepository
+      .createQueryBuilder('coupon')
+      .where('coupon.expire_date > :currentDate', { currentDate })
+      .orderBy('coupon.expire_date', 'ASC')
+      .getMany();
+
+    return {
+      status: 200,
+      message: 'Active coupons retrieved successfully',
+      length: activeCoupons.length,
+      data: activeCoupons,
+    };
+  }
 }

@@ -77,8 +77,8 @@ export class OrderController {
     @Headers('stripe-signature') sig,
     @Req() request: RawBodyRequest<Request>,
   ) {
-    const endpointSecret = `${process.env.ENDPOINTSECRET}`
-      
+    const endpointSecret = `${process.env.ENDPOINTSECRET}`;
+
     const payload = request.rawBody;
 
     return await this.orderService.updatePaidCard(payload, sig, endpointSecret);
@@ -95,14 +95,24 @@ export class OrderController {
   @Get('all')
   @Roles(['admin'])
   @UseGuards(UsersGuard)
-  findAllOrders() {
-    return this.orderService.findAllOrders();
+  async findAllOrders() {
+    return await this.orderService.findAllOrders();
   }
 
   @Get('user/:userId')
   @Roles(['admin'])
   @UseGuards(UsersGuard)
-  findAllOrdersByUserId(@Param('userId') userId: string) {
-    return this.orderService.findAllOrdersOnUser(+userId);
+  async findAllOrdersByUserId(@Param('userId') userId: number) {
+    return await this.orderService.findAllOrdersOnUser(userId);
+  }
+
+  
+
+  @Post('reorder/:orderId')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
+  async reorder(@Req() req, @Param('orderId') orderId: number) {
+    const user_id = req.user.id;
+    return await this.orderService.reorder(user_id, orderId);
   }
 }
