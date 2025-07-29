@@ -11,8 +11,6 @@ import {
   NotFoundException,
   RawBodyRequest,
   Headers,
-  Res,
-  HttpStatus,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
@@ -105,8 +103,6 @@ export class OrderController {
   async findAllOrdersByUserId(@Param('userId') userId: number) {
     return await this.orderService.findAllOrdersOnUser(userId);
   }
-
-  
 
   @Post('reorder/:orderId')
   @Roles(['user'])
