@@ -253,7 +253,7 @@ export class OrderService {
 
         const simplifiedOrder = {
           ...savedOrder,
-          user: { id: savedOrder.user.id },
+          user: { id: user_id },
         };
 
         return {
