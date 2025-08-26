@@ -34,7 +34,6 @@ export class OrderService {
     Client.init(process.env.COINBASE_API_KEY);
     this.coinbase = Client;
   }
-
   async create(
     user_id: number,
     paymentMethodType: 'card' | 'cash' | 'crypto',
@@ -49,32 +48,25 @@ export class OrderService {
         where: { user: { id: user_id } },
         relations: ['user'],
       });
-
       if (!cart || !cart.cartitems || cart.cartitems.length === 0) {
         throw new NotFoundException('Cart not found or is empty');
       }
-
       const tax = await this.taxRepository.findOne({
         where: {},
       });
-
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
-
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
       }
-
       const taxPrice = Number(tax?.taxprice ?? 0);
       let shippingPrice = 0;
       if (paymentMethodType === 'card') {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
-
       const productIdsInCart = cart.cartitems.map((item) => item.productId);
       const productsFromDb =
         await this.productRepository.findByIds(productIdsInCart);
-
       const enrichedCartItems = cart.cartitems.map((item) => {
         const productData = productsFromDb.find((p) => p.id === item.productId);
         if (!productData) {
@@ -95,22 +87,18 @@ export class OrderService {
           },
         };
       });
-
       let rawProductsTotalPrice = 0;
       enrichedCartItems.forEach((item) => {
         rawProductsTotalPrice +=
           Number(item.product.price_after_discount ?? item.product.price) *
           item.quantity;
       });
-
       const subtotalFromCart = Number(
         cart.total_price_after_discount ?? cart.total_price,
       );
-
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
-
       const orderData = {
         user: { id: user_id },
         cart_items: enrichedCartItems,
@@ -121,7 +109,6 @@ export class OrderService {
         shipping_address: shippingAddress,
         coupons: cart.coupons,
       };
-
       if (paymentMethodType === 'cash') {
         const order = this.orderRepository.create({
           ...orderData,
@@ -129,7 +116,6 @@ export class OrderService {
           paid_at: totalOrderPrice === 0 ? new Date() : null,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
@@ -142,24 +128,20 @@ export class OrderService {
         };
       } else if (paymentMethodType === 'card') {
         const line_items = [];
-
         enrichedCartItems.forEach((item) => {
           const baseUnitPrice = Number(
             item.product.price_after_discount ?? item.product.price,
           );
-
           let distributedDiscount = 0;
           if (rawProductsTotalPrice > 0) {
             distributedDiscount =
               ((baseUnitPrice * item.quantity) / rawProductsTotalPrice) *
               additionalDiscountToApply;
           }
-
           const finalUnitPrice = Math.max(
             0,
             baseUnitPrice - distributedDiscount / item.quantity,
           );
-
           line_items.push({
             price_data: {
               currency: 'usd',
@@ -173,7 +155,6 @@ export class OrderService {
             quantity: item.quantity,
           });
         });
-
         line_items.push({
           price_data: {
             currency: 'usd',
@@ -186,7 +167,6 @@ export class OrderService {
           },
           quantity: 1,
         });
-
         const session = await this.stripe.checkout.sessions.create({
           line_items,
           mode: 'payment',
@@ -198,20 +178,17 @@ export class OrderService {
             address: shippingAddress,
           },
         });
-
         const order = this.orderRepository.create({
           ...orderData,
           payment_id: session.id,
           is_paid: false,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
           user: { id: savedOrder.user.id },
         };
-
         return {
           status: 200,
           message: 'Order created successfully',
@@ -231,13 +208,11 @@ export class OrderService {
           is_paid: false,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-          user: { id: savedOrder.user.id },
+          user: { id: user_id },
         };
-
         const charge = await Charge.create({
           name: 'Order from My E-Commerce Store',
           description: `Order for user: ${cart.user.email}`,
@@ -254,12 +229,10 @@ export class OrderService {
           redirect_url: dataAfterPayment.success_url,
           cancel_url: dataAfterPayment.cancel_url,
         });
-
         await this.orderRepository.update(
           { id: savedOrder.id },
           { payment_id: charge.id },
         );
-
         return {
           status: 200,
           message: 'Order created successfully',
