@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
@@ -86,10 +87,23 @@ export class OrderService {
         rawProductsTotalPrice - subtotalFromCart;
 
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
-
+      const enrichedCartItems = cart.cartitems.map((item) => {
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            description: item.product.description,
+            image: item.product.image,
+            price: item.product.price,
+            price_after_discount: item.product.price_after_discount,
+          },
+        };
+      });
       const orderData = {
-        user: cart.user,
-        cart_items: cart.cartitems,
+        user: { id: user_id },
+        cart_items: enrichedCartItems,
         tax_price: taxPrice,
         shipping_price: shippingPrice,
         total_order_price: totalOrderPrice,
@@ -209,7 +223,12 @@ export class OrderService {
         });
 
         const savedOrder = await this.orderRepository.save(order);
-
+        if (!savedOrder) {
+          console.error('Failed to save the order to the database.');
+          throw new InternalServerErrorException(
+            'Failed to create order due to a database error.',
+          );
+        }
         const charge = await Charge.create({
           name: 'Order from My E-Commerce Store',
           description: `Order for user: ${cart.user.email}`,
