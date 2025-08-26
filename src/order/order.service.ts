@@ -47,7 +47,7 @@ export class OrderService {
     try {
       const cart = await this.cartRepository.findOne({
         where: { user: { id: user_id } },
-        relations: ['user', 'cartitems.product'],
+        relations: ['user'],
       });
 
       if (!cart) {
@@ -209,6 +209,11 @@ export class OrderService {
         });
 
         const savedOrder = await this.orderRepository.save(order);
+        // تم نقل هذا السطر بعد حفظ الطلب، لضمان أن savedOrder يحتوي على id
+        const simplifiedOrder = {
+          ...savedOrder,
+          user: { id: savedOrder.user.id },
+        };
 
         const charge = await Charge.create({
           name: 'Order from My E-Commerce Store',
@@ -221,7 +226,7 @@ export class OrderService {
           metadata: {
             user_id: user_id,
             shippingAddress: shippingAddress,
-            order_id: savedOrder.id,
+            order_id: savedOrder.id, // الآن savedOrder.id متاح للاستخدام
           },
           redirect_url: dataAfterPayment.success_url,
           cancel_url: dataAfterPayment.cancel_url,
@@ -231,11 +236,6 @@ export class OrderService {
           { id: savedOrder.id },
           { session_id: charge.id },
         );
-
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: savedOrder.user.id },
-        };
 
         return {
           status: 200,
