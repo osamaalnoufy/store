@@ -31,9 +31,9 @@ export class Order {
     color: string;
     product?: {
       id: number;
-      name: string; 
-      image: string; 
-      description: string; 
+      name: string;
+      image: string;
+      description: string;
       price: number;
       price_after_discount: number;
     };
@@ -50,7 +50,7 @@ export class Order {
 
   @Column({
     type: 'enum',
-    enum: ['cash', 'card'],
+    enum: ['cash', 'card', 'crypto'],
     default: 'card',
   })
   payment_method_type: string;
