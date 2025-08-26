@@ -47,7 +47,7 @@ export class OrderService {
     try {
       const cart = await this.cartRepository.findOne({
         where: { user: { id: user_id } },
-        relations: ['user'],
+        relations: ['user', 'cartitems.product'],
       });
 
       if (!cart) {
