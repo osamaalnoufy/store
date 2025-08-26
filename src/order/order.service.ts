@@ -107,7 +107,7 @@ export class OrderService {
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
 
       const orderData = {
-        user: cart.user,
+        user: { id: user_id },
         cart_items: enrichedCartItems, // استخدام البيانات المحدثة هنا
         tax_price: taxPrice,
         shipping_price: shippingPrice,
