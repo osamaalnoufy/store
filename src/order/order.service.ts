@@ -201,7 +201,7 @@ export class OrderService {
 
         const order = this.orderRepository.create({
           ...orderData,
-          session_id: session.id,
+          payment_id: session.id,
           is_paid: false,
           is_delivered: false,
         });
@@ -257,7 +257,7 @@ export class OrderService {
 
         await this.orderRepository.update(
           { id: savedOrder.id },
-          { session_id: charge.id },
+          { payment_id: charge.id },
         );
 
         return {
@@ -357,14 +357,14 @@ export class OrderService {
         const sessionId = event.data.object.id;
 
         const order = await this.orderRepository.findOne({
-          where: { session_id: sessionId },
+          where: { payment_id: sessionId },
           relations: ['user'],
         });
 
         if (!order) return;
 
         await this.orderRepository.update(
-          { session_id: order.session_id },
+          { payment_id: order.payment_id },
           {
             is_paid: true,
             is_delivered: true,
@@ -410,14 +410,14 @@ export class OrderService {
       const charge = event.data;
       const chargeId = charge.id;
       const order = await this.orderRepository.findOne({
-        where: { session_id: chargeId },
+        where: { payment_id: chargeId },
         relations: ['user'],
       });
 
       if (!order) return;
 
       await this.orderRepository.update(
-        { session_id: order.session_id },
+        { payment_id: order.payment_id },
         {
           is_paid: true,
           is_delivered: true,
@@ -468,7 +468,7 @@ export class OrderService {
       relations: ['user'],
       select: {
         id: true,
-        session_id: true,
+        payment_id: true,
         cart_items: true,
         tax_price: true,
         shipping_price: true,

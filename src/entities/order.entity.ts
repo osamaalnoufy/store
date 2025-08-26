@@ -22,7 +22,7 @@ export class Order {
   user: Users;
 
   @Column({ nullable: true })
-  session_id: string;
+  payment_id: string;
 
   @Column('jsonb')
   cart_items: Array<{
