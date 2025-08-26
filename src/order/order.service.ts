@@ -71,8 +71,27 @@ export class OrderService {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
 
+      // الحل: جلب بيانات المنتجات بشكل صريح من قاعدة البيانات
+      const productIdsInCart = cart.cartitems.map((item) => item.productId);
+      const productsFromDb =
+        await this.productRepository.findByIds(productIdsInCart);
+
+      // تحديث بيانات عربة التسوق ببيانات المنتجات الكاملة
+      const enrichedCartItems = cart.cartitems.map((item) => {
+        const productData = productsFromDb.find((p) => p.id === item.productId);
+        if (!productData) {
+          throw new NotFoundException(
+            `Product with id ${item.productId} not found`,
+          );
+        }
+        return {
+          ...item,
+          product: productData,
+        };
+      });
+
       let rawProductsTotalPrice = 0;
-      cart.cartitems.forEach((item) => {
+      enrichedCartItems.forEach((item) => {
         rawProductsTotalPrice +=
           Number(item.product.price_after_discount ?? item.product.price) *
           item.quantity;
@@ -89,7 +108,7 @@ export class OrderService {
 
       const orderData = {
         user: cart.user,
-        cart_items: cart.cartitems,
+        cart_items: enrichedCartItems, // استخدام البيانات المحدثة هنا
         tax_price: taxPrice,
         shipping_price: shippingPrice,
         total_order_price: totalOrderPrice,
@@ -119,7 +138,7 @@ export class OrderService {
       } else if (paymentMethodType === 'card') {
         const line_items = [];
 
-        cart.cartitems.forEach((item) => {
+        enrichedCartItems.forEach((item) => {
           const baseUnitPrice = Number(
             item.product.price_after_discount ?? item.product.price,
           );
@@ -209,7 +228,6 @@ export class OrderService {
         });
 
         const savedOrder = await this.orderRepository.save(order);
-        // تم نقل هذا السطر بعد حفظ الطلب، لضمان أن savedOrder يحتوي على id
         const simplifiedOrder = {
           ...savedOrder,
           user: { id: savedOrder.user.id },
@@ -226,7 +244,7 @@ export class OrderService {
           metadata: {
             user_id: user_id,
             shippingAddress: shippingAddress,
-            order_id: savedOrder.id, // الآن savedOrder.id متاح للاستخدام
+            order_id: savedOrder.id,
           },
           redirect_url: dataAfterPayment.success_url,
           cancel_url: dataAfterPayment.cancel_url,
