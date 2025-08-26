@@ -50,8 +50,8 @@ export class OrderService {
         relations: ['user'],
       });
 
-      if (!cart) {
-        throw new NotFoundException('Cart not found');
+      if (!cart || !cart.cartitems || cart.cartitems.length === 0) {
+        throw new NotFoundException('Cart not found or is empty');
       }
 
       const tax = await this.taxRepository.findOne({
@@ -71,12 +71,10 @@ export class OrderService {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
 
-      // الحل: جلب بيانات المنتجات بشكل صريح من قاعدة البيانات
       const productIdsInCart = cart.cartitems.map((item) => item.productId);
       const productsFromDb =
         await this.productRepository.findByIds(productIdsInCart);
 
-      // تحديث بيانات عربة التسوق ببيانات المنتجات الكاملة
       const enrichedCartItems = cart.cartitems.map((item) => {
         const productData = productsFromDb.find((p) => p.id === item.productId);
         if (!productData) {
@@ -85,8 +83,16 @@ export class OrderService {
           );
         }
         return {
-          ...item,
-          product: productData,
+          productId: item.productId,
+          quantity: item.quantity,
+          product: {
+            id: productData.id,
+            name: productData.name,
+            description: productData.description,
+            image: productData.image,
+            price: productData.price,
+            price_after_discount: productData.price_after_discount,
+          },
         };
       });
 
@@ -103,12 +109,11 @@ export class OrderService {
 
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
-
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
 
       const orderData = {
         user: { id: user_id },
-        cart_items: enrichedCartItems, // استخدام البيانات المحدثة هنا
+        cart_items: enrichedCartItems,
         tax_price: taxPrice,
         shipping_price: shippingPrice,
         total_order_price: totalOrderPrice,
