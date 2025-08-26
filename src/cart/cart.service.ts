@@ -1,9 +1,15 @@
-import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cart } from 'src/entities/cart.entity';
 import { Product } from 'src/entities/product.entity';
 import { Coupon } from 'src/entities/coupon.entity';
 import { In, Repository } from 'typeorm';
+import { Tax } from 'src/entities/tax.entity';
 
 @Injectable()
 export class CartService {
@@ -14,10 +20,77 @@ export class CartService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Coupon)
     private readonly couponRepository: Repository<Coupon>,
+    @InjectRepository(Tax)
+    private readonly taxRepository: Repository<Tax>,
   ) {}
+  async calculateCartTotals(cart) {
+    let totalPrice = 0;
+    let totalPriceAfterDiscount = 0;
 
-  async create(product_id: number, user_id: number, isElse?: boolean) {
-    const cart = await this.cartRepository.findOne({
+    for (const item of cart.cartitems) {
+      const itemProduct =
+        item.product ||
+        (await this.productRepository.findOne({
+          where: { id: item.productId },
+        }));
+
+      if (itemProduct) {
+        totalPrice += item.quantity * itemProduct.price;
+        totalPriceAfterDiscount +=
+          item.quantity *
+          (itemProduct.price_after_discount || itemProduct.price);
+      }
+    }
+
+    if (cart.coupons && cart.coupons.length > 0) {
+      const couponIds = cart.coupons.map((c) => c.couponId);
+      const coupons = await this.couponRepository.findByIds(couponIds);
+      const totalDiscountFromCoupons = coupons.reduce(
+        (sum, coupon) => sum + coupon.discount,
+        0,
+      );
+      totalPriceAfterDiscount = Math.max(
+        0,
+        totalPriceAfterDiscount - totalDiscountFromCoupons,
+      );
+    }
+
+    return { totalPrice, totalPriceAfterDiscount };
+  }
+  private async createTaxAndShippingMessages() {
+    const tax = await this.taxRepository.findOne({ where: {} });
+    const taxPrice = tax?.taxprice ?? 0;
+    const shippingPrice = tax?.shippingprice ?? 0;
+
+    return [
+      `Note: A tax of $${taxPrice} will be added to your total order price.`,
+      `A shipping fee of $${shippingPrice} is applied only for card or crypto payments.`,
+    ];
+  }
+  async create(product_id: number, user_id: number) {
+    const quantity = 1;
+    if (quantity <= 0) {
+      throw new BadRequestException('Quantity must be greater than 0');
+    }
+    const product = await this.productRepository.findOne({
+      where: { id: product_id },
+      select: [
+        'id',
+        'name',
+        'image',
+        'description',
+        'quantity',
+        'price',
+        'price_after_discount',
+      ],
+    });
+    if (!product) {
+      throw new NotFoundException('Not Found Product');
+    }
+    if (product.quantity < quantity) {
+      throw new BadRequestException('Not enough quantity on this product');
+    }
+    let cart = await this.cartRepository.findOne({
       where: { user: { id: user_id } },
       relations: ['user'],
       select: {
@@ -32,6 +105,75 @@ export class CartService {
       },
     });
 
+    let message: string | string[];
+
+    if (!cart) {
+      cart = this.cartRepository.create({
+        user: { id: user_id },
+        cartitems: [],
+        total_price: 0,
+        total_price_after_discount: 0,
+      });
+      message = ['Cart created and product inserted.'];
+    } else {
+      message = ['Product added to cart.'];
+    }
+
+    let productExists = false;
+    const updatedCartItems =
+      cart.cartitems?.map((item) => {
+        if (item.productId === product_id) {
+          productExists = true;
+          return {
+            ...item,
+            quantity: item.quantity + quantity,
+            product: {
+              id: product.id,
+              name: product.name,
+              image: product.image,
+              description: product.description,
+              price: product.price,
+              price_after_discount: product.price_after_discount,
+            },
+          };
+        }
+        return item;
+      }) || [];
+
+    if (!productExists) {
+      updatedCartItems.push({
+        productId: product_id,
+        quantity: quantity,
+        product: {
+          id: product.id,
+          name: product.name,
+          image: product.image,
+          description: product.description,
+          price: product.price,
+          price_after_discount: product.price_after_discount,
+        },
+      });
+    }
+    cart.cartitems = updatedCartItems;
+    const { totalPrice, totalPriceAfterDiscount } =
+      await this.calculateCartTotals(cart);
+    cart.total_price = totalPrice;
+    cart.total_price_after_discount = totalPriceAfterDiscount;
+    const savedCart = await this.cartRepository.save(cart);
+
+    const taxAndShippingMessages = await this.createTaxAndShippingMessages();
+
+    return {
+      status: 200,
+      message: [...message, ...taxAndShippingMessages],
+      data: savedCart,
+    };
+  }
+
+  async addMultiple(product_id: number, user_id: number, quantity: number) {
+    if (quantity <= 0) {
+      throw new BadRequestException('Quantity must be greater than 0');
+    }
     const product = await this.productRepository.findOne({
       where: { id: product_id },
       select: [
@@ -44,100 +186,88 @@ export class CartService {
         'price_after_discount',
       ],
     });
-
     if (!product) {
       throw new NotFoundException('Not Found Product');
     }
-
-    if (product.quantity <= 0) {
-      throw new NotFoundException('Not Found quantity on this product');
+    if (product.quantity < quantity) {
+      throw new BadRequestException('Not enough quantity on this product');
     }
+    let cart = await this.cartRepository.findOne({
+      where: { user: { id: user_id } },
+      relations: ['user'],
+      select: {
+        id: true,
+        cartitems: true,
+        total_price: true,
+        total_price_after_discount: true,
+        coupons: true,
+        created_at: true,
+        updated_at: true,
+        user: { id: true },
+      },
+    });
 
-    if (cart) {
-      let productExists = false;
+    let message: string | string[];
 
-      const updatedCartItems =
-        cart.cartitems?.map((item) => {
-          if (item.productId === product_id) {
-            productExists = true;
-            return {
-              ...item,
-              quantity: item.quantity + 1,
-              product: {
-                id: product.id,
-                name: product.name,
-                image: product.image,
-                description: product.description,
-                price: product.price,
-                price_after_discount: product.price_after_discount,
-              },
-            };
-          }
-          return item;
-        }) || [];
-
-      if (!productExists) {
-        updatedCartItems.push({
-          productId: product_id,
-          quantity: 1,
-          product: {
-            id: product.id,
-            name: product.name,
-            image: product.image,
-            description: product.description,
-            price: product.price,
-            price_after_discount: product.price_after_discount,
-          },
-        });
-      }
-
-      let totalPrice = 0;
-      let totalPriceAfterDiscount = 0;
-
-      for (const item of updatedCartItems) {
-        const itemProduct =
-          item.product ||
-          (await this.productRepository.findOne({
-            where: { id: item.productId },
-          }));
-
-        totalPrice += item.quantity * itemProduct.price;
-        totalPriceAfterDiscount +=
-          item.quantity *
-          (itemProduct.price_after_discount || itemProduct.price);
-      }
-
-      cart.cartitems = updatedCartItems;
-      cart.total_price = totalPrice;
-      cart.total_price_after_discount = totalPriceAfterDiscount;
-
-      await this.cartRepository.save(cart);
-
-      if (isElse) {
-        return cart;
-      } else {
-        return {
-          status: 200,
-          message: 'Created Cart and Insert Product',
-          data: cart,
-        };
-      }
-    } else {
-      const newCart = this.cartRepository.create({
+    if (!cart) {
+      cart = this.cartRepository.create({
+        user: { id: user_id },
         cartitems: [],
         total_price: 0,
-        user: { id: user_id },
+        total_price_after_discount: 0,
       });
-      await this.cartRepository.save(newCart);
-
-      const inserProduct = await this.create(product_id, user_id, true);
-
-      return {
-        status: 200,
-        message: 'Created Cart and Insert Product',
-        data: inserProduct,
-      };
+      message = ['Cart created and product inserted.'];
+    } else {
+      message = ['Product added to cart.'];
     }
+
+    let productExists = false;
+    const updatedCartItems =
+      cart.cartitems?.map((item) => {
+        if (item.productId === product_id) {
+          productExists = true;
+          return {
+            ...item,
+            quantity: item.quantity + quantity,
+            product: {
+              id: product.id,
+              name: product.name,
+              image: product.image,
+              description: product.description,
+              price: product.price,
+              price_after_discount: product.price_after_discount,
+            },
+          };
+        }
+        return item;
+      }) || [];
+    if (!productExists) {
+      updatedCartItems.push({
+        productId: product_id,
+        quantity: quantity,
+        product: {
+          id: product.id,
+          name: product.name,
+          image: product.image,
+          description: product.description,
+          price: product.price,
+          price_after_discount: product.price_after_discount,
+        },
+      });
+    }
+    cart.cartitems = updatedCartItems;
+    const { totalPrice, totalPriceAfterDiscount } =
+      await this.calculateCartTotals(cart);
+    cart.total_price = totalPrice;
+    cart.total_price_after_discount = totalPriceAfterDiscount;
+    const savedCart = await this.cartRepository.save(cart);
+    const taxAndShippingMessages = await this.createTaxAndShippingMessages();
+
+    return {
+      status: 200,
+      message: [...message, ...taxAndShippingMessages],
+      data: savedCart,
+    };
   }
 
   async applyCoupon(user_id: number, couponName: string) {
@@ -318,6 +448,11 @@ export class CartService {
     const updatedCartItems = [...(cart.cartitems || [])];
     const productItem = updatedCartItems[productIndex];
 
+    const message =
+      productItem.quantity > 1
+        ? 'Product quantity decreased by 1'
+        : 'Product removed from cart';
+
     if (productItem.quantity > 1) {
       updatedCartItems[productIndex] = {
         ...productItem,
@@ -327,43 +462,13 @@ export class CartService {
       updatedCartItems.splice(productIndex, 1);
     }
 
-    let totalPrice = 0;
-    let totalPriceAfterDiscount = 0;
-    let totalDiscountFromCoupons = 0;
+    cart.cartitems = updatedCartItems;
+    const { totalPrice, totalPriceAfterDiscount } =
+      await this.calculateCartTotals(cart);
+    cart.total_price = totalPrice;
+    cart.total_price_after_discount = totalPriceAfterDiscount;
 
-    for (const item of updatedCartItems) {
-      const product = await this.productRepository.findOne({
-        where: { id: item.productId },
-        select: ['price', 'price_after_discount'],
-      });
-
-      if (product) {
-        totalPrice += item.quantity * product.price;
-        totalPriceAfterDiscount +=
-          item.quantity * (product.price_after_discount || product.price);
-      }
-    }
-
-    if (cart.coupons?.length > 0) {
-      const couponIds = cart.coupons.map((c) => c.couponId);
-      const coupons = await this.couponRepository.findByIds(couponIds);
-
-      totalDiscountFromCoupons = coupons.reduce(
-        (sum, coupon) => sum + coupon.discount,
-        0,
-      );
-    }
-
-    totalPriceAfterDiscount = Math.max(
-      0,
-      totalPriceAfterDiscount - totalDiscountFromCoupons,
-    );
-
-    await this.cartRepository.update(cart.id, {
-      cartitems: updatedCartItems,
-      total_price: totalPrice,
-      total_price_after_discount: totalPriceAfterDiscount,
-    });
+    await this.cartRepository.save(cart);
 
     const updatedCart = await this.cartRepository.findOne({
       where: { id: cart.id },
@@ -380,6 +485,7 @@ export class CartService {
       },
     });
 
+    // جلب بيانات المنتجات مرة أخرى بعد الحذف
     if (updatedCart?.cartitems) {
       const productIds = updatedCart.cartitems.map((item) => item.productId);
       const products = await this.productRepository.find({
@@ -412,12 +518,81 @@ export class CartService {
       });
     }
 
+    const taxAndShippingMessages = await this.createTaxAndShippingMessages();
+
     return {
       status: 200,
-      message:
-        productItem.quantity > 1
-          ? 'Product quantity decreased by 1'
-          : 'Product removed from cart',
+      message: [message, ...taxAndShippingMessages],
+      data: updatedCart,
+    };
+  }
+
+  async removeMultiple(productId: number, user_id: number, quantity: number) {
+    if (quantity <= 0) {
+      throw new BadRequestException(
+        'Quantity to remove must be greater than 0',
+      );
+    }
+    const cart = await this.cartRepository.findOne({
+      where: { user: { id: user_id } },
+      relations: ['user'],
+      select: {
+        id: true,
+        cartitems: true,
+        total_price: true,
+        total_price_after_discount: true,
+        coupons: true,
+        created_at: true,
+        updated_at: true,
+        user: { id: true },
+      },
+    });
+    if (!cart) {
+      throw new NotFoundException('Not Found Cart');
+    }
+    const productIndex =
+      cart.cartitems?.findIndex((item) => item.productId === productId) ?? -1;
+    if (productIndex === -1) {
+      throw new NotFoundException('Product not found in cart');
+    }
+    const updatedCartItems = [...(cart.cartitems || [])];
+    const productItem = updatedCartItems[productIndex];
+    if (productItem.quantity < quantity) {
+      throw new BadRequestException(
+        `Cannot remove ${quantity} items, only ${productItem.quantity} are in the cart.`,
+      );
+    }
+    let message = '';
+    if (productItem.quantity > quantity) {
+      updatedCartItems[productIndex] = {
+        ...productItem,
+        quantity: productItem.quantity - quantity,
+      };
+      message = 'Product quantity decreased successfully';
+    } else {
+      updatedCartItems.splice(productIndex, 1);
+      message = 'Product removed from cart completely';
+    }
+    cart.cartitems = updatedCartItems;
+    const { totalPrice, totalPriceAfterDiscount } =
+      await this.calculateCartTotals(cart);
+    cart.total_price = totalPrice;
+    cart.total_price_after_discount = totalPriceAfterDiscount;
+    await this.cartRepository.update(cart.id, {
+      cartitems: updatedCartItems,
+      total_price: totalPrice,
+      total_price_after_discount: totalPriceAfterDiscount,
+    });
+    const updatedCart = await this.cartRepository.findOne({
+      where: { id: cart.id },
+      relations: ['user'],
+    });
+
+    const taxAndShippingMessages = await this.createTaxAndShippingMessages();
+
+    return {
+      status: 200,
+      message: [message, ...taxAndShippingMessages],
       data: updatedCart,
     };
   }
@@ -579,7 +754,7 @@ export class CartService {
                   id: product.id,
                   name: product.name,
                   description: product.description,
-                  image:product.image,
+                  image: product.image,
                   price: product.price,
                   price_after_discount: product.price_after_discount,
                 }
