@@ -249,10 +249,13 @@ export class OrderService {
             shippingAddress,
             order_id: savedOrder.id,
           },
-          redirect_url: dataAfterPayment.success_url, // Coinbase يقبله
-          // cancel_url: dataAfterPayment.cancel_url, ❌ مو مدعوم
+          redirect_url: dataAfterPayment.success_url,
         });
-        console.log('Charge response:', charge);
+
+        console.log(
+          '👉 FULL CHARGE RESPONSE:',
+          JSON.stringify(charge, null, 2),
+        );
 
         await this.orderRepository.update(
           { id: savedOrder.id },
