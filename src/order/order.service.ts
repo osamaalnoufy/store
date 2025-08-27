@@ -31,7 +31,7 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
-    Client.init(process.env.COINBASE_API_KEY);
+    Client.init(`${process.env.COINBASE_API_KEY}`);
     this.coinbase = Client;
   }
 
