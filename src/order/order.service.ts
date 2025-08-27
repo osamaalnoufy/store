@@ -246,12 +246,13 @@ export class OrderService {
           pricing_type: 'fixed_price',
           metadata: {
             user_id,
-            shippingAddress: shippingAddress,
+            shippingAddress,
             order_id: savedOrder.id,
           },
-          redirect_url: dataAfterPayment.success_url,
-          cancel_url: dataAfterPayment.cancel_url,
+          redirect_url: dataAfterPayment.success_url, // Coinbase يقبله
+          // cancel_url: dataAfterPayment.cancel_url, ❌ مو مدعوم
         });
+        console.log('Charge response:', charge);
 
         await this.orderRepository.update(
           { id: savedOrder.id },
