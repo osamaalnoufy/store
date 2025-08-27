@@ -50,19 +50,28 @@ export class OrderService {
         relations: ['user'],
       });
 
-      if (!cart) {
-        throw new NotFoundException('Cart not found');
-      }
+      if (!cart) throw new NotFoundException('Cart not found');
 
-      const tax = await this.taxRepository.findOne({
-        where: {},
-      });
+      const tax = await this.taxRepository.findOne({ where: {} });
 
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
-
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
+      }
+
+      const cartItems = Array.isArray(cart.cartitems) ? cart.cartitems : [];
+
+      // 👇 نطبع أول عنصر من cartitems لفحص بياناته
+      console.log('cartitems sample', cartItems[0]);
+
+      // اجمع السعر الخام بأمان حتى لو product غير موجود
+      let rawProductsTotalPrice = 0;
+      for (const item of cartItems) {
+        const base = Number(
+          item?.product?.price_after_discount ?? item?.product?.price ?? 0,
+        );
+        rawProductsTotalPrice += base * Number(item?.quantity ?? 0);
       }
 
       const taxPrice = Number(tax?.taxprice ?? 0);
@@ -71,37 +80,31 @@ export class OrderService {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
 
-      let rawProductsTotalPrice = 0;
-      cart.cartitems.forEach((item) => {
-        rawProductsTotalPrice +=
-          Number(item.product.price_after_discount ?? item.product.price) *
-          item.quantity;
-      });
-
       const subtotalFromCart = Number(
-        cart.total_price_after_discount ?? cart.total_price,
+        cart.total_price_after_discount ?? cart.total_price ?? 0,
       );
 
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
-
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
-      const enrichedCartItems = cart.cartitems.map((item) => {
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          product: item.product
-            ? {
-                id: item.product.id,
-                name: item.product.name,
-                description: item.product.description,
-                image: item.product.image,
-                price: item.product.price,
-                price_after_discount: item.product.price_after_discount,
-              }
-            : null,
-        };
-      });
+
+      const enrichedCartItems = cartItems.map((item) => ({
+        productId: item?.productId ?? item?.product?.id ?? null,
+        quantity: item?.quantity ?? 0,
+        color: (item as any)?.color ?? null,
+        product: item?.product
+          ? {
+              id: item?.product?.id ?? null,
+              name: item?.product?.name ?? null,
+              description: item?.product?.description ?? null,
+              image: item?.product?.image ?? null,
+              price: Number(item?.product?.price ?? 0),
+              price_after_discount: Number(
+                item?.product?.price_after_discount ?? 0,
+              ),
+            }
+          : null,
+      }));
 
       const orderData = {
         user: { id: user_id },
@@ -127,68 +130,74 @@ export class OrderService {
           ...savedOrder,
           user: { id: user_id },
         };
+
         return {
           status: 200,
           message: 'Order created successfully',
           data: simplifiedOrder,
         };
       } else if (paymentMethodType === 'card') {
-        const line_items = [];
+        const line_items: any[] = [];
 
-        cart.cartitems.forEach((item) => {
+        for (const item of cartItems) {
           const baseUnitPrice = Number(
-            item.product.price_after_discount ?? item.product.price,
+            item?.product?.price_after_discount ?? item?.product?.price ?? 0,
           );
 
           let distributedDiscount = 0;
           if (rawProductsTotalPrice > 0) {
             distributedDiscount =
-              ((baseUnitPrice * item.quantity) / rawProductsTotalPrice) *
+              ((baseUnitPrice * Number(item?.quantity ?? 0)) /
+                rawProductsTotalPrice) *
               additionalDiscountToApply;
           }
 
           const finalUnitPrice = Math.max(
             0,
-            baseUnitPrice - distributedDiscount / item.quantity,
+            baseUnitPrice -
+              distributedDiscount / Math.max(1, Number(item?.quantity ?? 1)),
           );
 
+          const name =
+            item?.product?.name ?? `Product #${item?.productId ?? ''}`;
+          const description = item?.product?.description ?? '';
+          const images = item?.product?.image ? [item.product.image] : [];
+
+          if (finalUnitPrice > 0 && Number(item?.quantity ?? 0) > 0) {
+            line_items.push({
+              price_data: {
+                currency: 'usd',
+                unit_amount: Math.round(finalUnitPrice * 100),
+                product_data: { name, description, images },
+              },
+              quantity: Number(item?.quantity ?? 0),
+            });
+          }
+        }
+
+        if (taxPrice + shippingPrice > 0) {
           line_items.push({
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(finalUnitPrice * 100),
+              unit_amount: Math.round((taxPrice + shippingPrice) * 100),
               product_data: {
-                name: item.product.name,
-                description: item.product.description,
-                images: item.product.image ? [item.product.image] : [],
+                name: 'Taxes and Shipping Fees',
+                description: 'Includes all taxes and shipping costs',
+                images: [],
               },
             },
-            quantity: item.quantity,
+            quantity: 1,
           });
-        });
-
-        line_items.push({
-          price_data: {
-            currency: 'usd',
-            unit_amount: Math.round((taxPrice + shippingPrice) * 100),
-            product_data: {
-              name: 'Taxes and Shipping Fees',
-              description: 'Includes all taxes and shipping costs',
-              images: [],
-            },
-          },
-          quantity: 1,
-        });
+        }
 
         const session = await this.stripe.checkout.sessions.create({
           line_items,
           mode: 'payment',
           success_url: dataAfterPayment.success_url,
           cancel_url: dataAfterPayment.cancel_url,
-          client_reference_id: user_id.toString(),
-          customer_email: cart.user.email,
-          metadata: {
-            address: shippingAddress,
-          },
+          client_reference_id: String(user_id),
+          customer_email: cart.user?.email ?? undefined,
+          metadata: { address: String(shippingAddress) },
         });
 
         const order = this.orderRepository.create({
@@ -211,7 +220,7 @@ export class OrderService {
             url: session.url,
             success_url: `${session.success_url}?session_id=${session.id}`,
             cancel_url: session.cancel_url,
-            expires_at: new Date(session.expires_at * 1000),
+            expires_at: new Date((session.expires_at as number) * 1000),
             sessionId: session.id,
             totalPrice: Math.round(totalOrderPrice * 100),
             data: simplifiedOrder,
@@ -226,21 +235,18 @@ export class OrderService {
 
         const savedOrder = await this.orderRepository.save(order);
         if (!savedOrder) {
-          console.error('Failed to save the order to the database.');
           throw new InternalServerErrorException(
             'Failed to create order due to a database error.',
           );
         }
+
         const charge = await Charge.create({
           name: 'Order from My E-Commerce Store',
-          description: `Order for user: ${cart.user.email}`,
-          local_price: {
-            amount: totalOrderPrice.toString(),
-            currency: 'USD',
-          },
+          description: `Order for user: ${cart.user?.email ?? user_id}`,
+          local_price: { amount: String(totalOrderPrice), currency: 'USD' },
           pricing_type: 'fixed_price',
           metadata: {
-            user_id: user_id,
+            user_id,
             shippingAddress: shippingAddress,
             order_id: savedOrder.id,
           },
@@ -272,9 +278,11 @@ export class OrderService {
         };
       }
     } catch (error) {
+      console.error('CreateOrder Error:', error);
       throw error;
     }
   }
+
   async updatePaidCash(orderId: number, updateOrderDto: AcceptOrderCashDto) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
