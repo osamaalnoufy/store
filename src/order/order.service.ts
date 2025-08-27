@@ -7,14 +7,14 @@ import {
 } from '@nestjs/common';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Order } from 'src/entities/order.entity';
 import { Cart } from 'src/entities/cart.entity';
 import { Tax } from 'src/entities/tax.entity';
 import { Product } from 'src/entities/product.entity';
 import Stripe from 'stripe';
 import { Users } from 'src/entities/users.entity';
-import { Client, resources ,Webhook } from 'coinbase-commerce-node';
+import { Client, resources, Webhook } from 'coinbase-commerce-node';
 const { Charge } = resources;
 @Injectable()
 export class OrderService {
@@ -34,6 +34,7 @@ export class OrderService {
     Client.init(process.env.COINBASE_API_KEY);
     this.coinbase = Client;
   }
+
   async create(
     user_id: number,
     paymentMethodType: 'card' | 'cash' | 'crypto',
@@ -48,33 +49,10 @@ export class OrderService {
         where: { user: { id: user_id } },
         relations: ['user'],
       });
+
       if (!cart) {
         throw new NotFoundException('Cart not found');
       }
-      const productIds = cart.cartitems.map((item) => item.productId);
-      const products = await this.productRepository.find({
-        where: { id: In(productIds) },
-      });
-
-      cart.cartitems = cart.cartitems.map((item) => {
-        const product = products.find((p) => p.id === item.productId);
-        if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${item.productId} not found`,
-          );
-        }
-        return {
-          ...item,
-          product: {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            image: product.image,
-            price: product.price,
-            price_after_discount: product.price_after_discount,
-          },
-        };
-      });
 
       const tax = await this.taxRepository.findOne({
         where: {},
@@ -82,37 +60,33 @@ export class OrderService {
 
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
+
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
       }
 
       const taxPrice = Number(tax?.taxprice ?? 0);
       let shippingPrice = 0;
-      if (paymentMethodType === 'card' || paymentMethodType === 'crypto') {
+      if (paymentMethodType === 'card') {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
+
       let rawProductsTotalPrice = 0;
       cart.cartitems.forEach((item) => {
         rawProductsTotalPrice +=
           Number(item.product.price_after_discount ?? item.product.price) *
           item.quantity;
       });
+
       const subtotalFromCart = Number(
         cart.total_price_after_discount ?? cart.total_price,
       );
+
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
+
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
-      const invalidItems = cart.cartitems.filter((item) => !item.product);
-      if (invalidItems.length > 0) {
-        throw new BadRequestException(
-          'Some cart items are missing product data',
-        );
-      }
       const enrichedCartItems = cart.cartitems.map((item) => {
-        if (!item.product) {
-          throw new Error(`Product not found for cart item: ${item.productId}`);
-        }
         return {
           productId: item.productId,
           quantity: item.quantity,
@@ -136,6 +110,7 @@ export class OrderService {
         shipping_address: shippingAddress,
         coupons: cart.coupons,
       };
+
       if (paymentMethodType === 'cash') {
         const order = this.orderRepository.create({
           ...orderData,
@@ -143,10 +118,11 @@ export class OrderService {
           paid_at: totalOrderPrice === 0 ? new Date() : null,
           is_delivered: false,
         });
+
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-          user: { id: savedOrder.user.id },
+           user: { id: user_id },
         };
         return {
           status: 200,
@@ -155,20 +131,24 @@ export class OrderService {
         };
       } else if (paymentMethodType === 'card') {
         const line_items = [];
+
         cart.cartitems.forEach((item) => {
           const baseUnitPrice = Number(
             item.product.price_after_discount ?? item.product.price,
           );
+
           let distributedDiscount = 0;
           if (rawProductsTotalPrice > 0) {
             distributedDiscount =
               ((baseUnitPrice * item.quantity) / rawProductsTotalPrice) *
               additionalDiscountToApply;
           }
+
           const finalUnitPrice = Math.max(
             0,
             baseUnitPrice - distributedDiscount / item.quantity,
           );
+
           line_items.push({
             price_data: {
               currency: 'usd',
@@ -182,6 +162,7 @@ export class OrderService {
             quantity: item.quantity,
           });
         });
+
         line_items.push({
           price_data: {
             currency: 'usd',
@@ -194,6 +175,7 @@ export class OrderService {
           },
           quantity: 1,
         });
+
         const session = await this.stripe.checkout.sessions.create({
           line_items,
           mode: 'payment',
@@ -205,17 +187,20 @@ export class OrderService {
             address: shippingAddress,
           },
         });
+
         const order = this.orderRepository.create({
           ...orderData,
           session_id: session.id,
           is_paid: false,
           is_delivered: false,
         });
+
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-          user: { id: savedOrder.user.id },
+           user: { id: user_id },
         };
+
         return {
           status: 200,
           message: 'Order created successfully',
@@ -235,6 +220,7 @@ export class OrderService {
           is_paid: false,
           is_delivered: false,
         });
+
         const savedOrder = await this.orderRepository.save(order);
         if (!savedOrder) {
           console.error('Failed to save the order to the database.');
@@ -283,23 +269,7 @@ export class OrderService {
         };
       }
     } catch (error) {
-      console.error('Order creation error:', {
-        message: error.message,
-        stack: error.stack,
-        user_id,
-        paymentMethodType,
-      });
-
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException(
-        'Order creation failed: ' + error.message,
-      );
+      throw error;
     }
   }
   async updatePaidCash(orderId: number, updateOrderDto: AcceptOrderCashDto) {
