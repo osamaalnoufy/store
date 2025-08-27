@@ -88,23 +88,22 @@ export class OrderService {
         rawProductsTotalPrice - subtotalFromCart;
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
 
-      const enrichedCartItems = cartItems.map((item) => ({
-        productId: item?.productId ?? item?.product?.id ?? null,
-        quantity: item?.quantity ?? 0,
-        color: (item as any)?.color ?? null,
-        product: item?.product
-          ? {
-              id: item?.product?.id ?? null,
-              name: item?.product?.name ?? null,
-              description: item?.product?.description ?? null,
-              image: item?.product?.image ?? null,
-              price: Number(item?.product?.price ?? 0),
-              price_after_discount: Number(
-                item?.product?.price_after_discount ?? 0,
-              ),
-            }
-          : null,
-      }));
+      const enrichedCartItems = cartItems.map((item: any) => {
+        const product = item.product || {}; // 👈 إذا ما في product نخليه {}
+        return {
+          productId: item.productId ?? product.id ?? null,
+          quantity: item.quantity ?? 0,
+          color: item.color ?? null,
+          product: {
+            id: product.id ?? null,
+            name: product.name ?? null,
+            description: product.description ?? null,
+            image: product.image ?? null,
+            price: Number(product.price ?? 0),
+            price_after_discount: Number(product.price_after_discount ?? 0),
+          },
+        };
+      });
 
       const orderData = {
         user: { id: user_id },
