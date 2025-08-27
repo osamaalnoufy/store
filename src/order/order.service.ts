@@ -234,10 +234,10 @@ export class OrderService {
 
         const savedOrder = await this.orderRepository.save(order);
         if (!savedOrder) {
-          throw new InternalServerErrorException(
-            'Failed to create order due to a database error.',
-          );
+          throw new Error('❌ Order was not saved, cannot create charge.');
         }
+
+        console.log('✅ Order Saved:', savedOrder.id);
 
         const charge = await Charge.create({
           name: 'Order from My E-Commerce Store',
