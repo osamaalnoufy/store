@@ -35,7 +35,6 @@ export class OrderService {
     Client.init(process.env.COINBASE_API_KEY);
     this.coinbase = Client;
   }
-
   async create(
     user_id: number,
     paymentMethodType: 'card' | 'cash' | 'crypto',
@@ -50,44 +49,44 @@ export class OrderService {
         where: { user: { id: user_id } },
         relations: ['user'],
       });
-
       if (!cart) {
         throw new NotFoundException('Cart not found');
       }
-
       const tax = await this.taxRepository.findOne({
         where: {},
       });
-
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
-
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
       }
-
       const taxPrice = Number(tax?.taxprice ?? 0);
       let shippingPrice = 0;
       if (paymentMethodType === 'card') {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
-
       let rawProductsTotalPrice = 0;
       cart.cartitems.forEach((item) => {
         rawProductsTotalPrice +=
           Number(item.product.price_after_discount ?? item.product.price) *
           item.quantity;
       });
-
       const subtotalFromCart = Number(
         cart.total_price_after_discount ?? cart.total_price,
       );
-
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
-
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
+      const invalidItems = cart.cartitems.filter((item) => !item.product);
+      if (invalidItems.length > 0) {
+        throw new BadRequestException(
+          'Some cart items are missing product data',
+        );
+      }
       const enrichedCartItems = cart.cartitems.map((item) => {
+        if (!item.product) {
+          throw new Error(`Product not found for cart item: ${item.productId}`);
+        }
         return {
           productId: item.productId,
           quantity: item.quantity,
@@ -111,7 +110,6 @@ export class OrderService {
         shipping_address: shippingAddress,
         coupons: cart.coupons,
       };
-
       if (paymentMethodType === 'cash') {
         const order = this.orderRepository.create({
           ...orderData,
@@ -119,7 +117,6 @@ export class OrderService {
           paid_at: totalOrderPrice === 0 ? new Date() : null,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
@@ -132,24 +129,20 @@ export class OrderService {
         };
       } else if (paymentMethodType === 'card') {
         const line_items = [];
-
         cart.cartitems.forEach((item) => {
           const baseUnitPrice = Number(
             item.product.price_after_discount ?? item.product.price,
           );
-
           let distributedDiscount = 0;
           if (rawProductsTotalPrice > 0) {
             distributedDiscount =
               ((baseUnitPrice * item.quantity) / rawProductsTotalPrice) *
               additionalDiscountToApply;
           }
-
           const finalUnitPrice = Math.max(
             0,
             baseUnitPrice - distributedDiscount / item.quantity,
           );
-
           line_items.push({
             price_data: {
               currency: 'usd',
@@ -163,7 +156,6 @@ export class OrderService {
             quantity: item.quantity,
           });
         });
-
         line_items.push({
           price_data: {
             currency: 'usd',
@@ -176,7 +168,6 @@ export class OrderService {
           },
           quantity: 1,
         });
-
         const session = await this.stripe.checkout.sessions.create({
           line_items,
           mode: 'payment',
@@ -188,20 +179,17 @@ export class OrderService {
             address: shippingAddress,
           },
         });
-
         const order = this.orderRepository.create({
           ...orderData,
           session_id: session.id,
           is_paid: false,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
           user: { id: savedOrder.user.id },
         };
-
         return {
           status: 200,
           message: 'Order created successfully',
@@ -221,7 +209,6 @@ export class OrderService {
           is_paid: false,
           is_delivered: false,
         });
-
         const savedOrder = await this.orderRepository.save(order);
         if (!savedOrder) {
           console.error('Failed to save the order to the database.');
@@ -270,6 +257,9 @@ export class OrderService {
         };
       }
     } catch (error) {
+      if (error instanceof TypeError) {
+        throw new InternalServerErrorException('Product data is incomplete');
+      }
       throw error;
     }
   }
