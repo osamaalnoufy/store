@@ -19,7 +19,7 @@ const { Charge } = resources;
 @Injectable()
 export class OrderService {
   private stripe: Stripe;
-  // private coinbase: typeof Client;
+  private coinbase: typeof Client;
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -31,8 +31,12 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
+    if (`${!process.env.COINBASE_API_KEY}`) {
+      console.error('❌ Coinbase API key is missing');
+      throw new Error('Coinbase API key is missing');
+    }
     Client.init(`${process.env.COINBASE_API_KEY}`);
-    // this.coinbase = Client;
+    this.coinbase = Client;
   }
 
   async create(
