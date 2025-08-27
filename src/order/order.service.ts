@@ -31,10 +31,6 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
-    if (`${!process.env.COINBASE_API_KEY}`) {
-      console.error('❌ Coinbase API key is missing');
-      throw new Error('Coinbase API key is missing');
-    }
     Client.init(`${process.env.COINBASE_API_KEY}`);
     this.coinbase = Client;
   }
@@ -230,6 +226,10 @@ export class OrderService {
           },
         };
       } else if (paymentMethodType === 'crypto') {
+        if (`${!process.env.COINBASE_API_KEY}`) {
+          console.error('❌ Coinbase API key is missing');
+          throw new Error('Coinbase API key is missing');
+        }
         const order = this.orderRepository.create({
           ...orderData,
           is_paid: false,
