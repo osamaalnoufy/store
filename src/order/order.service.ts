@@ -52,18 +52,29 @@ export class OrderService {
       if (!cart) {
         throw new NotFoundException('Cart not found');
       }
+
+      // تحقق من وجود عناصر في السلة
+      if (!cart.cartitems || cart.cartitems.length === 0) {
+        throw new BadRequestException('Cart is empty');
+      }
+
       const productIds = cart.cartitems.map((item) => item.productId);
       const products = await this.productRepository.find({
         where: { id: In(productIds) },
       });
 
+      // تحقق من وجود جميع المنتجات
+      const missingProductIds = productIds.filter(
+        (id) => !products.some((p) => p.id === id),
+      );
+      if (missingProductIds.length > 0) {
+        throw new NotFoundException(
+          `Products not found with IDs: ${missingProductIds.join(', ')}`,
+        );
+      }
+
       cart.cartitems = cart.cartitems.map((item) => {
         const product = products.find((p) => p.id === item.productId);
-        if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${item.productId} not found`,
-          );
-        }
         return {
           ...item,
           product: {
@@ -77,12 +88,10 @@ export class OrderService {
         };
       });
 
-      const tax = await this.taxRepository.findOne({
-        where: {},
-      });
-
+      const tax = await this.taxRepository.findOne({ where: {} });
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
+
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
       }
@@ -92,28 +101,22 @@ export class OrderService {
       if (paymentMethodType === 'card' || paymentMethodType === 'crypto') {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
+
       let rawProductsTotalPrice = 0;
       cart.cartitems.forEach((item) => {
         rawProductsTotalPrice +=
           Number(item.product.price_after_discount ?? item.product.price) *
           item.quantity;
       });
+
       const subtotalFromCart = Number(
         cart.total_price_after_discount ?? cart.total_price,
       );
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
-      const invalidItems = cart.cartitems.filter((item) => !item.product);
-      if (invalidItems.length > 0) {
-        throw new BadRequestException(
-          'Some cart items are missing product data',
-        );
-      }
+
       const enrichedCartItems = cart.cartitems.map((item) => {
-        if (!item.product) {
-          throw new Error(`Product not found for cart item: ${item.productId}`);
-        }
         return {
           productId: item.productId,
           quantity: item.quantity,
@@ -127,6 +130,7 @@ export class OrderService {
           },
         };
       });
+
       const orderData = {
         user: { id: user_id },
         cart_items: enrichedCartItems,
@@ -137,7 +141,9 @@ export class OrderService {
         shipping_address: shippingAddress,
         coupons: cart.coupons,
       };
+
       if (paymentMethodType === 'cash') {
+        // كود الكاش كما هو
         const order = this.orderRepository.create({
           ...orderData,
           is_paid: totalOrderPrice === 0,
@@ -145,16 +151,16 @@ export class OrderService {
           is_delivered: false,
         });
         const savedOrder = await this.orderRepository.save(order);
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: savedOrder.user.id },
-        };
         return {
           status: 200,
           message: 'Order created successfully',
-          data: simplifiedOrder,
+          data: {
+            ...savedOrder,
+            user: { id: savedOrder.user.id },
+          },
         };
       } else if (paymentMethodType === 'card') {
+        // كود الكارد كما هو
         const line_items = [];
         cart.cartitems.forEach((item) => {
           const baseUnitPrice = Number(
@@ -183,18 +189,22 @@ export class OrderService {
             quantity: item.quantity,
           });
         });
-        line_items.push({
-          price_data: {
-            currency: 'usd',
-            unit_amount: Math.round((taxPrice + shippingPrice) * 100),
-            product_data: {
-              name: 'Taxes and Shipping Fees',
-              description: 'Includes all taxes and shipping costs',
-              images: [],
+
+        if (taxPrice + shippingPrice > 0) {
+          line_items.push({
+            price_data: {
+              currency: 'usd',
+              unit_amount: Math.round((taxPrice + shippingPrice) * 100),
+              product_data: {
+                name: 'Taxes and Shipping Fees',
+                description: 'Includes all taxes and shipping costs',
+                images: [],
+              },
             },
-          },
-          quantity: 1,
-        });
+            quantity: 1,
+          });
+        }
+
         const session = await this.stripe.checkout.sessions.create({
           line_items,
           mode: 'payment',
@@ -202,86 +212,117 @@ export class OrderService {
           cancel_url: dataAfterPayment.cancel_url,
           client_reference_id: user_id.toString(),
           customer_email: cart.user.email,
-          metadata: {
-            address: shippingAddress,
-          },
+          metadata: { address: shippingAddress },
         });
+
         const order = this.orderRepository.create({
           ...orderData,
           session_id: session.id,
           is_paid: false,
           is_delivered: false,
         });
+
         const savedOrder = await this.orderRepository.save(order);
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: savedOrder.user.id },
-        };
+
         return {
           status: 200,
           message: 'Order created successfully',
           data: {
             url: session.url,
-            success_url: `${session.success_url}?session_id=${session.id}`,
+            success_url: `${dataAfterPayment.success_url}?session_id=${session.id}`,
             cancel_url: session.cancel_url,
             expires_at: new Date(session.expires_at * 1000),
             sessionId: session.id,
             totalPrice: Math.round(totalOrderPrice * 100),
-            data: simplifiedOrder,
+            order: {
+              id: savedOrder.id,
+              user: { id: savedOrder.user.id },
+              total_order_price: savedOrder.total_order_price,
+            },
           },
         };
       } else if (paymentMethodType === 'crypto') {
+        // كود الكريبتو المعدل
+        if (!cart.user?.email) {
+          throw new BadRequestException(
+            'User email is required for crypto payment',
+          );
+        }
+
+        if (totalOrderPrice <= 0) {
+          throw new BadRequestException(
+            'Total order price must be greater than 0 for crypto payment',
+          );
+        }
+
+        // إنشاء الطلب أولاً
         const order = this.orderRepository.create({
           ...orderData,
           is_paid: false,
           is_delivered: false,
         });
+
         const savedOrder = await this.orderRepository.save(order);
+
         if (!savedOrder) {
-          console.error('Failed to save the order to the database.');
           throw new InternalServerErrorException(
-            'Failed to create order due to a database error.',
+            'Failed to save order to database',
           );
         }
-        const charge = await Charge.create({
-          name: 'Order from My E-Commerce Store',
-          description: `Order for user: ${cart.user.email}`,
-          local_price: {
-            amount: totalOrderPrice,
-            currency: 'USD',
-          },
-          pricing_type: 'fixed_price',
-          metadata: {
-            user_id: user_id,
-            shippingAddress: shippingAddress,
-            order_id: savedOrder.id,
-          },
-          redirect_url: dataAfterPayment.success_url,
-          cancel_url: dataAfterPayment.cancel_url,
-        });
 
-        await this.orderRepository.update(
-          { id: savedOrder.id },
-          { session_id: charge.id },
-        );
-
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: user_id },
-        };
-
-        return {
-          status: 200,
-          message: 'Order created successfully',
-          data: {
-            url: charge.hosted_url,
-            success_url: `${dataAfterPayment.success_url}?charge_id=${charge.id}`,
+        try {
+          // إنشاء شحنة الكريبتو
+          const charge = await Charge.create({
+            name: 'Order from My E-Commerce Store',
+            description: `Order #${savedOrder.id} for ${cart.user.email}`,
+            local_price: {
+              amount: totalOrderPrice.toFixed(2),
+              currency: 'USD',
+            },
+            pricing_type: 'fixed_price',
+            metadata: {
+              user_id: user_id.toString(),
+              order_id: savedOrder.id.toString(),
+              shipping_address: shippingAddress,
+            },
+            redirect_url: dataAfterPayment.success_url,
             cancel_url: dataAfterPayment.cancel_url,
-            sessionId: charge.id,
-            totalPrice: totalOrderPrice,
-            data: simplifiedOrder,
-          },
-        };
+          });
+
+          // تحديث الطلب بـ session_id
+          await this.orderRepository.update(
+            { id: savedOrder.id },
+            { session_id: charge.id },
+          );
+
+          // إرجاع response مشابه للكارد
+          return {
+            status: 200,
+            message: 'Order created successfully',
+            data: {
+              url: charge.hosted_url,
+              success_url: `${dataAfterPayment.success_url}?charge_id=${charge.id}&order_id=${savedOrder.id}`,
+              cancel_url: dataAfterPayment.cancel_url,
+              expires_at: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+              sessionId: charge.id,
+              totalPrice: totalOrderPrice,
+              order: {
+                id: savedOrder.id,
+                user: { id: user_id },
+                total_order_price: totalOrderPrice,
+                payment_method_type: 'crypto',
+                is_paid: false,
+                created_at: savedOrder.created_at,
+              },
+            },
+          };
+        } catch (coinbaseError) {
+          // إذا فشلت عملية الدفع، احذف الطلب
+          await this.orderRepository.delete({ id: savedOrder.id });
+          throw new InternalServerErrorException(
+            'Crypto payment failed: ' + coinbaseError.message,
+          );
+        }
       }
     } catch (error) {
       console.error('Order creation error:', {
