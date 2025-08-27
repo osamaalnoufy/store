@@ -239,55 +239,54 @@ export class OrderService {
 
         console.log('✅ Order Saved:', savedOrder.id);
 
-        const response = await axios.post(
-          'https://api.commerce.coinbase.com/charges',
-          {
+        try {
+          // ⚠️ المكان الذي تم تعديله: استخدام المكتبة مباشرة بدلاً من axios
+          const charge = await Charge.create({
             name: 'Order from My E-Commerce Store',
             description: `Order for user: ${cart.user?.email ?? user_id}`,
             local_price: { amount: String(totalOrderPrice), currency: 'USD' },
             pricing_type: 'fixed_price',
             metadata: {
-              user_id,
-              shippingAddress,
-              order_id: savedOrder.id,
+              // حول user_id إلى نص لأن حقل metadata يقبل قيم نصية فقط
+              user_id: user_id.toString(),
+              shippingAddress: String(shippingAddress),
+              order_id: savedOrder.id.toString(),
             },
             redirect_url: dataAfterPayment.success_url,
             cancel_url: dataAfterPayment.cancel_url,
-          },
-          {
-            headers: {
-              'X-CC-Api-Key': `${process.env.COINBASE_API_KEY}`,
-              'X-CC-Version': '2018-03-22',
-              'Content-Type': 'application/json',
+          });
+
+          console.log('✅ Coinbase Charge Created:', charge);
+
+          await this.orderRepository.update(
+            { id: savedOrder.id },
+            { session_id: charge.id },
+          );
+
+          const simplifiedOrder = {
+            ...savedOrder,
+            user: { id: user_id },
+          };
+
+          return {
+            status: 200,
+            message: 'Order created successfully',
+            data: {
+              url: charge.hosted_url,
+              success_url: `${dataAfterPayment.success_url}?charge_id=${charge.id}`,
+              cancel_url: dataAfterPayment.cancel_url,
+              sessionId: charge.id,
+              totalPrice: totalOrderPrice,
+              data: simplifiedOrder,
             },
-          },
-        );
-
-        const charge = response.data.data; // 👈 البيانات الصحيحة من REST API
-        console.log('✅ Coinbase Charge Created:', charge);
-
-        await this.orderRepository.update(
-          { id: savedOrder.id },
-          { session_id: charge.id },
-        );
-
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: user_id },
-        };
-
-        return {
-          status: 200,
-          message: 'Order created successfully',
-          data: {
-            url: charge.hosted_url,
-            success_url: `${dataAfterPayment.success_url}?charge_id=${charge.id}`,
-            cancel_url: dataAfterPayment.cancel_url,
-            sessionId: charge.id,
-            totalPrice: totalOrderPrice,
-            data: simplifiedOrder,
-          },
-        };
+          };
+        } catch (apiError) {
+          console.error('Coinbase API Error:', apiError);
+          // يمكنك فحص apiError.message أو apiError.response.status
+          throw new BadRequestException(
+            `Coinbase API error: ${apiError.message || apiError.name}`,
+          );
+        }
       }
     } catch (error) {
       console.error('CreateOrder Error:', error);
