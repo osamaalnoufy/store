@@ -30,6 +30,7 @@ export class OrderService {
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
   ) {
+    console.log('API Key:', process.env.COINBASE_API_KEY);
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
     Client.init(`${process.env.COINBASE_API_KEY}`);
     this.coinbase = Client;
