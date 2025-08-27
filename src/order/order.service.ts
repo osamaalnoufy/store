@@ -90,16 +90,19 @@ export class OrderService {
         return {
           productId: item.productId,
           quantity: item.quantity,
-          product: {
-            id: item.product.id,
-            name: item.product.name,
-            description: item.product.description,
-            image: item.product.image,
-            price: item.product.price,
-            price_after_discount: item.product.price_after_discount,
-          },
+          product: item.product
+            ? {
+                id: item.product.id,
+                name: item.product.name,
+                description: item.product.description,
+                image: item.product.image,
+                price: item.product.price,
+                price_after_discount: item.product.price_after_discount,
+              }
+            : null,
         };
       });
+
       const orderData = {
         user: { id: user_id },
         cart_items: enrichedCartItems,
@@ -122,7 +125,7 @@ export class OrderService {
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-           user: { id: user_id },
+          user: { id: user_id },
         };
         return {
           status: 200,
@@ -198,7 +201,7 @@ export class OrderService {
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-           user: { id: user_id },
+          user: { id: user_id },
         };
 
         return {
