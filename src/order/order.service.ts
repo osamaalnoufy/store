@@ -31,7 +31,7 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
-    // Client.init(`${process.env.COINBASE_API_KEY}`);
+    Client.init(`${process.env.COINBASE_API_KEY}`);
     // this.coinbase = Client;
   }
 
@@ -226,7 +226,6 @@ export class OrderService {
           },
         };
       } else if (paymentMethodType === 'crypto') {
-        Client.init(`${process.env.COINBASE_API_KEY}`);
         const order = this.orderRepository.create({
           ...orderData,
           is_paid: false,
@@ -283,6 +282,7 @@ export class OrderService {
           };
         } catch (apiError) {
           console.error('Coinbase API Error:', apiError);
+          console.error('API Error Response:', apiError.response?.data);
           // يمكنك فحص apiError.message أو apiError.response.status
           throw new BadRequestException(
             `Coinbase API error: ${apiError.message || apiError.name}`,
