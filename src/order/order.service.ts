@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from 'src/entities/order.entity';
 import { Cart } from 'src/entities/cart.entity';
 import { Tax } from 'src/entities/tax.entity';
@@ -52,17 +52,44 @@ export class OrderService {
       if (!cart) {
         throw new NotFoundException('Cart not found');
       }
+      const productIds = cart.cartitems.map((item) => item.productId);
+      const products = await this.productRepository.find({
+        where: { id: In(productIds) },
+      });
+
+      cart.cartitems = cart.cartitems.map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) {
+          throw new NotFoundException(
+            `Product with ID ${item.productId} not found`,
+          );
+        }
+        return {
+          ...item,
+          product: {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            image: product.image,
+            price: product.price,
+            price_after_discount: product.price_after_discount,
+          },
+        };
+      });
+
       const tax = await this.taxRepository.findOne({
         where: {},
       });
+
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
       }
+
       const taxPrice = Number(tax?.taxprice ?? 0);
       let shippingPrice = 0;
-      if (paymentMethodType === 'card') {
+      if (paymentMethodType === 'card' || paymentMethodType === 'crypto') {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
       let rawProductsTotalPrice = 0;
@@ -257,10 +284,23 @@ export class OrderService {
         };
       }
     } catch (error) {
-      if (error instanceof TypeError) {
-        throw new InternalServerErrorException('Product data is incomplete');
+      console.error('Order creation error:', {
+        message: error.message,
+        stack: error.stack,
+        user_id,
+        paymentMethodType,
+      });
+
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
       }
-      throw error;
+
+      throw new InternalServerErrorException(
+        'Order creation failed: ' + error.message,
+      );
     }
   }
   async updatePaidCash(orderId: number, updateOrderDto: AcceptOrderCashDto) {
