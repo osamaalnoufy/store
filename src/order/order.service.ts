@@ -19,7 +19,7 @@ const { Charge } = resources;
 @Injectable()
 export class OrderService {
   private stripe: Stripe;
-  private coinbase: typeof Client;
+  // private coinbase: typeof Client;
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -31,8 +31,8 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
-    Client.init(`${process.env.COINBASE_API_KEY}`);
-    this.coinbase = Client;
+    // Client.init(`${process.env.COINBASE_API_KEY}`);
+    // this.coinbase = Client;
   }
 
   async create(
@@ -226,6 +226,7 @@ export class OrderService {
           },
         };
       } else if (paymentMethodType === 'crypto') {
+        Client.init(`${process.env.COINBASE_API_KEY}`);
         const order = this.orderRepository.create({
           ...orderData,
           is_paid: false,
