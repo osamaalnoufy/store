@@ -227,7 +227,8 @@ export class OrderService {
           },
         };
       } else if (paymentMethodType === 'crypto') {
-        if (`${!process.env.COINBASE_API_KEY}`) {
+        // الكود الصحيح
+        if (!process.env.COINBASE_API_KEY) {
           console.error('❌ Coinbase API key is missing');
           throw new Error('Coinbase API key is missing');
         }
