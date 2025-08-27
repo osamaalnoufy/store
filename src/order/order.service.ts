@@ -2,9 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import axios from 'axios';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -239,23 +239,32 @@ export class OrderService {
 
         console.log('✅ Order Saved:', savedOrder.id);
 
-        const charge = await Charge.create({
-          name: 'Order from My E-Commerce Store',
-          description: `Order for user: ${cart.user?.email ?? user_id}`,
-          local_price: { amount: String(totalOrderPrice), currency: 'USD' },
-          pricing_type: 'fixed_price',
-          metadata: {
-            user_id,
-            shippingAddress,
-            order_id: savedOrder.id,
+        const response = await axios.post(
+          'https://api.commerce.coinbase.com/charges',
+          {
+            name: 'Order from My E-Commerce Store',
+            description: `Order for user: ${cart.user?.email ?? user_id}`,
+            local_price: { amount: String(totalOrderPrice), currency: 'USD' },
+            pricing_type: 'fixed_price',
+            metadata: {
+              user_id,
+              shippingAddress,
+              order_id: savedOrder.id,
+            },
+            redirect_url: dataAfterPayment.success_url,
+            cancel_url: dataAfterPayment.cancel_url,
           },
-          redirect_url: dataAfterPayment.success_url,
-        });
-
-        console.log(
-          '👉 FULL CHARGE RESPONSE:',
-          JSON.stringify(charge, null, 2),
+          {
+            headers: {
+              'X-CC-Api-Key': process.env.COINBASE_API_KEY,
+              'X-CC-Version': '2018-03-22',
+              'Content-Type': 'application/json',
+            },
+          },
         );
+
+        const charge = response.data.data; // 👈 البيانات الصحيحة من REST API
+        console.log('✅ Coinbase Charge Created:', charge);
 
         await this.orderRepository.update(
           { id: savedOrder.id },
