@@ -64,7 +64,7 @@ export class CartService {
 
     return [
       `Note: A tax of $${taxPrice} will be added to your total order price.`,
-      `A shipping fee of $${shippingPrice} is applied only for card or crypto payments.`,
+      `A shipping fee of $${shippingPrice} is applied only for card payments.`,
     ];
   }
   async create(product_id: number, user_id: number) {
