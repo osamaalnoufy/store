@@ -50,7 +50,7 @@ export class Order {
 
   @Column({
     type: 'enum',
-    enum: ['cash', 'card', 'crypto'],
+    enum: ['cash', 'card'],
     default: 'card',
   })
   payment_method_type: string;

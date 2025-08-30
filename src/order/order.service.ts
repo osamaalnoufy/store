@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import axios from 'axios';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,12 +13,11 @@ import { Tax } from 'src/entities/tax.entity';
 import { Product } from 'src/entities/product.entity';
 import Stripe from 'stripe';
 import { Users } from 'src/entities/users.entity';
-import { Client, resources, Webhook } from 'coinbase-commerce-node';
-const { Charge } = resources;
+
 @Injectable()
 export class OrderService {
   private stripe: Stripe;
-  private coinbase: typeof Client;
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -29,16 +27,15 @@ export class OrderService {
     private readonly taxRepository: Repository<Tax>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Users)
+    private readonly userRepository: Repository<Users>,
   ) {
-    console.log('API Key:', process.env.COINBASE_API_KEY);
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
-    Client.init(`${process.env.COINBASE_API_KEY}`);
-    this.coinbase = Client;
   }
 
   async create(
     user_id: number,
-    paymentMethodType: 'card' | 'cash' | 'crypto',
+    paymentMethodType: 'card' | 'cash',
     createOrderDto: CreateOrderDto,
     dataAfterPayment: {
       success_url: string;
@@ -51,28 +48,19 @@ export class OrderService {
         relations: ['user'],
       });
 
-      if (!cart) throw new NotFoundException('Cart not found');
+      if (!cart) {
+        throw new NotFoundException('Cart not found');
+      }
 
-      const tax = await this.taxRepository.findOne({ where: {} });
+      const tax = await this.taxRepository.findOne({
+        where: {},
+      });
 
       const shippingAddress =
         cart.user?.address || createOrderDto.shippingAddress || null;
+
       if (!shippingAddress) {
         throw new NotFoundException('Shipping address not found');
-      }
-
-      const cartItems = Array.isArray(cart.cartitems) ? cart.cartitems : [];
-
-      // 👇 نطبع أول عنصر من cartitems لفحص بياناته
-      console.log('cartitems sample', cartItems[0]);
-
-      // اجمع السعر الخام بأمان حتى لو product غير موجود
-      let rawProductsTotalPrice = 0;
-      for (const item of cartItems) {
-        const base = Number(
-          item?.product?.price_after_discount ?? item?.product?.price ?? 0,
-        );
-        rawProductsTotalPrice += base * Number(item?.quantity ?? 0);
       }
 
       const taxPrice = Number(tax?.taxprice ?? 0);
@@ -81,34 +69,25 @@ export class OrderService {
         shippingPrice = Number(tax?.shippingprice ?? 0);
       }
 
+      let rawProductsTotalPrice = 0;
+      cart.cartitems.forEach((item) => {
+        rawProductsTotalPrice +=
+          Number(item.product.price_after_discount ?? item.product.price) *
+          item.quantity;
+      });
+
       const subtotalFromCart = Number(
-        cart.total_price_after_discount ?? cart.total_price ?? 0,
+        cart.total_price_after_discount ?? cart.total_price,
       );
 
       const additionalDiscountToApply =
         rawProductsTotalPrice - subtotalFromCart;
+
       const totalOrderPrice = subtotalFromCart + taxPrice + shippingPrice;
 
-      const enrichedCartItems = cartItems.map((item: any) => {
-        const product = item.product || {}; // 👈 إذا ما في product نخليه {}
-        return {
-          productId: item.productId ?? product.id ?? null,
-          quantity: item.quantity ?? 0,
-          color: item.color ?? null,
-          product: {
-            id: product.id ?? null,
-            name: product.name ?? null,
-            description: product.description ?? null,
-            image: product.image ?? null,
-            price: Number(product.price ?? 0),
-            price_after_discount: Number(product.price_after_discount ?? 0),
-          },
-        };
-      });
-
       const orderData = {
-        user: { id: user_id },
-        cart_items: enrichedCartItems,
+        user: cart.user,
+        cart_items: cart.cartitems,
         tax_price: taxPrice,
         shipping_price: shippingPrice,
         total_order_price: totalOrderPrice,
@@ -128,176 +107,103 @@ export class OrderService {
         const savedOrder = await this.orderRepository.save(order);
         const simplifiedOrder = {
           ...savedOrder,
-          user: { id: user_id },
+          user: { id: savedOrder.user.id },
         };
-
         return {
           status: 200,
           message: 'Order created successfully',
           data: simplifiedOrder,
         };
-      } else if (paymentMethodType === 'card') {
-        const line_items: any[] = [];
-
-        for (const item of cartItems) {
-          const baseUnitPrice = Number(
-            item?.product?.price_after_discount ?? item?.product?.price ?? 0,
-          );
-
-          let distributedDiscount = 0;
-          if (rawProductsTotalPrice > 0) {
-            distributedDiscount =
-              ((baseUnitPrice * Number(item?.quantity ?? 0)) /
-                rawProductsTotalPrice) *
-              additionalDiscountToApply;
-          }
-
-          const finalUnitPrice = Math.max(
-            0,
-            baseUnitPrice -
-              distributedDiscount / Math.max(1, Number(item?.quantity ?? 1)),
-          );
-
-          const name =
-            item?.product?.name ?? `Product #${item?.productId ?? ''}`;
-          const description = item?.product?.description ?? '';
-          const images = item?.product?.image ? [item.product.image] : [];
-
-          if (finalUnitPrice > 0 && Number(item?.quantity ?? 0) > 0) {
-            line_items.push({
-              price_data: {
-                currency: 'usd',
-                unit_amount: Math.round(finalUnitPrice * 100),
-                product_data: { name, description, images },
-              },
-              quantity: Number(item?.quantity ?? 0),
-            });
-          }
-        }
-
-        if (taxPrice + shippingPrice > 0) {
-          line_items.push({
-            price_data: {
-              currency: 'usd',
-              unit_amount: Math.round((taxPrice + shippingPrice) * 100),
-              product_data: {
-                name: 'Taxes and Shipping Fees',
-                description: 'Includes all taxes and shipping costs',
-                images: [],
-              },
-            },
-            quantity: 1,
-          });
-        }
-
-        const session = await this.stripe.checkout.sessions.create({
-          line_items,
-          mode: 'payment',
-          success_url: dataAfterPayment.success_url,
-          cancel_url: dataAfterPayment.cancel_url,
-          client_reference_id: String(user_id),
-          customer_email: cart.user?.email ?? undefined,
-          metadata: { address: String(shippingAddress) },
-        });
-
-        const order = this.orderRepository.create({
-          ...orderData,
-          session_id: session.id,
-          is_paid: false,
-          is_delivered: false,
-        });
-
-        const savedOrder = await this.orderRepository.save(order);
-        const simplifiedOrder = {
-          ...savedOrder,
-          user: { id: user_id },
-        };
-
-        return {
-          status: 200,
-          message: 'Order created successfully',
-          data: {
-            url: session.url,
-            success_url: `${session.success_url}?session_id=${session.id}`,
-            cancel_url: session.cancel_url,
-            expires_at: new Date((session.expires_at as number) * 1000),
-            sessionId: session.id,
-            totalPrice: Math.round(totalOrderPrice * 100),
-            data: simplifiedOrder,
-          },
-        };
-      } else if (paymentMethodType === 'crypto') {
-        if (!process.env.COINBASE_API_KEY) {
-          console.error('❌ Coinbase API key is missing');
-          throw new Error('Coinbase API key is missing');
-        }
-        const order = this.orderRepository.create({
-          ...orderData,
-          is_paid: false,
-          is_delivered: false,
-        });
-
-        const savedOrder = await this.orderRepository.save(order);
-        if (!savedOrder) {
-          throw new Error('❌ Order was not saved, cannot create charge.');
-        }
-
-        console.log('✅ Order Saved:', savedOrder.id);
-
-        try {
-          const charge = await Charge.create({
-            name: 'Order from My E-Commerce Store',
-            description: `Order for user: ${cart.user?.email ?? user_id}`,
-            local_price: { amount: String(totalOrderPrice), currency: 'USD' },
-            pricing_type: 'fixed_price',
-            metadata: {
-              user_id: user_id.toString(),
-              shippingAddress: String(shippingAddress),
-              order_id: savedOrder.id.toString(),
-            },
-            redirect_url: dataAfterPayment.success_url,
-            cancel_url: dataAfterPayment.cancel_url,
-          });
-
-          console.log('✅ Coinbase Charge Created:', charge);
-
-          // 💡 التعديل هنا: نقل هذا السطر داخل الـ try block
-          await this.orderRepository.update(
-            { id: savedOrder.id },
-            { session_id: charge.id },
-          );
-
-          const simplifiedOrder = {
-            ...savedOrder,
-            user: { id: user_id },
-          };
-
-          return {
-            status: 200,
-            message: 'Order created successfully',
-            data: {
-              url: charge.hosted_url,
-              success_url: `${dataAfterPayment.success_url}?charge_id=${charge.id}`,
-              cancel_url: dataAfterPayment.cancel_url,
-              sessionId: charge.id,
-              totalPrice: totalOrderPrice,
-              data: simplifiedOrder,
-            },
-          };
-        } catch (apiError) {
-          console.error('Coinbase API Error:', apiError);
-          // يمكنك فحص apiError.message أو apiError.response.status
-          throw new BadRequestException(
-            `Coinbase API error: ${apiError.message || 'Unknown error'}`,
-          );
-        }
       }
+
+      const line_items = [];
+
+      cart.cartitems.forEach((item) => {
+        const baseUnitPrice = Number(
+          item.product.price_after_discount ?? item.product.price,
+        );
+
+        let distributedDiscount = 0;
+        if (rawProductsTotalPrice > 0) {
+          distributedDiscount =
+            ((baseUnitPrice * item.quantity) / rawProductsTotalPrice) *
+            additionalDiscountToApply;
+        }
+
+        const finalUnitPrice = Math.max(
+          0,
+          baseUnitPrice - distributedDiscount / item.quantity,
+        );
+
+        line_items.push({
+          price_data: {
+            currency: 'usd',
+            unit_amount: Math.round(finalUnitPrice * 100),
+            product_data: {
+              name: item.product.name,
+              description: item.product.description,
+              images: item.product.image ? [item.product.image] : [],
+            },
+          },
+          quantity: item.quantity,
+        });
+      });
+
+      line_items.push({
+        price_data: {
+          currency: 'usd',
+          unit_amount: Math.round((taxPrice + shippingPrice) * 100),
+          product_data: {
+            name: 'Taxes and Shipping Fees',
+            description: 'Includes all taxes and shipping costs',
+            images: [],
+          },
+        },
+        quantity: 1,
+      });
+
+      const session = await this.stripe.checkout.sessions.create({
+        line_items,
+        mode: 'payment',
+        success_url: dataAfterPayment.success_url,
+        cancel_url: dataAfterPayment.cancel_url,
+        client_reference_id: user_id.toString(),
+        customer_email: cart.user.email,
+        metadata: {
+          address: shippingAddress,
+        },
+      });
+
+      const order = this.orderRepository.create({
+        ...orderData,
+        session_id: session.id,
+        is_paid: false,
+        is_delivered: false,
+      });
+
+      const savedOrder = await this.orderRepository.save(order);
+      const simplifiedOrder = {
+        ...savedOrder,
+        user: { id: savedOrder.user.id },
+      };
+
+      return {
+        status: 200,
+        message: 'Order created successfully',
+        data: {
+          url: session.url,
+          success_url: `${session.success_url}?session_id=${session.id}`,
+          cancel_url: session.cancel_url,
+          expires_at: new Date(session.expires_at * 1000),
+          sessionId: session.id,
+          totalPrice: Math.round(totalOrderPrice * 100),
+          data: simplifiedOrder,
+        },
+      };
     } catch (error) {
-      console.error('CreateOrder Error:', error);
       throw error;
     }
   }
-
   async updatePaidCash(orderId: number, updateOrderDto: AcceptOrderCashDto) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
@@ -408,59 +314,6 @@ export class OrderService {
           }
           await this.cartRepository.delete({ user: { id: order.user.id } });
         }
-    }
-  }
-  async updatePaidCrypto(
-    payload: Buffer,
-    signature: string,
-    endpointSecret: string,
-  ) {
-    let event: any;
-    try {
-      event = Webhook.verifyEventBody(
-        payload.toString(),
-        signature,
-        endpointSecret,
-      );
-    } catch (error) {
-      console.error(`Webhook signature verification failed.`, error.message);
-      throw new BadRequestException(`Webhook Error: ${error.message}`);
-    }
-
-    if (event.type === 'charge:confirmed') {
-      const charge = event.data;
-      const chargeId = charge.id;
-      const order = await this.orderRepository.findOne({
-        where: { session_id: chargeId },
-        relations: ['user'],
-      });
-
-      if (!order) return;
-
-      await this.orderRepository.update(
-        { session_id: order.session_id },
-        {
-          is_paid: true,
-          is_delivered: true,
-          paid_at: new Date(),
-          delivered_at: new Date(),
-        },
-      );
-
-      const cart = await this.cartRepository.findOne({
-        where: { user: { id: order.user.id } },
-        relations: ['user'],
-      });
-
-      if (cart) {
-        for (const item of cart.cartitems) {
-          await this.productRepository.update(item.productId, {
-            quantity: () => `quantity - ${item.quantity}`,
-            sold: () => `sold + ${item.quantity}`,
-          });
-        }
-        await this.cartRepository.delete({ user: { id: order.user.id } });
-      }
     }
   }
 

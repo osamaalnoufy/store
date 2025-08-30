@@ -25,14 +25,14 @@ export class OrderController {
   @Roles(['user'])
   @UseGuards(UsersGuard)
   async create(
-    @Param('paymentMethodType') paymentMethodType: 'card' | 'cash' | 'crypto',
+    @Param('paymentMethodType') paymentMethodType: 'card' | 'cash',
     @Body()
     createOrderDto: CreateOrderDto,
     @Req() req,
     @Query() query,
   ) {
     try {
-      if (!['card', 'cash', 'crypto'].includes(paymentMethodType)) {
+      if (!['card', 'cash'].includes(paymentMethodType)) {
         throw new NotFoundException('No payment method found');
       }
 
@@ -81,19 +81,7 @@ export class OrderController {
 
     return await this.orderService.updatePaidCard(payload, sig, endpointSecret);
   }
-  @Post('crypto/webhook')
-  async updatePaidCrypto(
-    @Headers('x-cc-webhook-signature') sig,
-    @Req() request: RawBodyRequest<Request>,
-  ) {
-    const webhookSecret = `${process.env.COINBASE_WEBHOOK_SECRET}`;
-    const payload = request.rawBody;
-    return await this.orderService.updatePaidCrypto(
-      payload,
-      sig,
-      webhookSecret,
-    );
-  }
+
   @Get()
   @Roles(['user'])
   @UseGuards(UsersGuard)
