@@ -16,7 +16,7 @@ import { OrderService } from './order.service';
 import { AcceptOrderCashDto, CreateOrderDto } from './dto/create-order.dto';
 import { Roles } from 'src/users/Guards/roles.decorator';
 import { UsersGuard } from 'src/users/Guards/users.guard';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 @Controller('order')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}

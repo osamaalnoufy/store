@@ -27,8 +27,6 @@ export class OrderService {
     private readonly taxRepository: Repository<Tax>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
-    @InjectRepository(Users)
-    private readonly userRepository: Repository<Users>,
   ) {
     this.stripe = new Stripe(`${process.env.STRIPE_SECRET_KEY}`);
   }
