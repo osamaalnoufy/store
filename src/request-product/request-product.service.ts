@@ -96,6 +96,30 @@ export class RequestProductService {
     };
   }
 
+  async findUserRequests(user_id: number) {
+    const userRequests = await this.requestProductRepository.find({
+      where: { user: { id: user_id } },
+      relations: ['user'],
+    });
+
+    if (!userRequests || userRequests.length === 0) {
+      throw new HttpException('No requests found for this user', 404);
+    }
+
+    return {
+      status: 200,
+      message: 'User requests found',
+      data: userRequests.map((reqProduct) => ({
+        id: reqProduct.id,
+        name: reqProduct.name,
+        details: reqProduct.details,
+        quantity: reqProduct.quantity,
+        category: reqProduct.category,
+        user_id: reqProduct.user.id,
+      })),
+    };
+  }
+
   async update(
     id: number,
     updateRequestProductDto: UpdateRequestProductDto,

@@ -43,6 +43,13 @@ export class RequestProductController {
   async findOne(@Param('id') id: number) {
     return await this.requestProductService.findOne(id);
   }
+  @Get('my-requestsProduct')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
+  async findMyRequests(@Request() req: any) {
+    const { id } = req.user;
+    return await this.requestProductService.findUserRequests(id);
+  }
 
   @Patch('update/:id')
   @Roles(['user'])
