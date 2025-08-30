@@ -227,7 +227,6 @@ export class OrderService {
           },
         };
       } else if (paymentMethodType === 'crypto') {
-        // الكود الصحيح
         if (!process.env.COINBASE_API_KEY) {
           console.error('❌ Coinbase API key is missing');
           throw new Error('Coinbase API key is missing');
@@ -246,14 +245,12 @@ export class OrderService {
         console.log('✅ Order Saved:', savedOrder.id);
 
         try {
-          // ⚠️ المكان الذي تم تعديله: استخدام المكتبة مباشرة بدلاً من axios
           const charge = await Charge.create({
             name: 'Order from My E-Commerce Store',
             description: `Order for user: ${cart.user?.email ?? user_id}`,
             local_price: { amount: String(totalOrderPrice), currency: 'USD' },
             pricing_type: 'fixed_price',
             metadata: {
-              // حول user_id إلى نص لأن حقل metadata يقبل قيم نصية فقط
               user_id: user_id.toString(),
               shippingAddress: String(shippingAddress),
               order_id: savedOrder.id.toString(),
@@ -264,6 +261,7 @@ export class OrderService {
 
           console.log('✅ Coinbase Charge Created:', charge);
 
+          // 💡 التعديل هنا: نقل هذا السطر داخل الـ try block
           await this.orderRepository.update(
             { id: savedOrder.id },
             { session_id: charge.id },
@@ -288,10 +286,9 @@ export class OrderService {
           };
         } catch (apiError) {
           console.error('Coinbase API Error:', apiError);
-          console.error('API Error Response:', apiError.response?.data);
           // يمكنك فحص apiError.message أو apiError.response.status
           throw new BadRequestException(
-            `Coinbase API error: ${apiError.message || apiError.name}`,
+            `Coinbase API error: ${apiError.message || 'Unknown error'}`,
           );
         }
       }
