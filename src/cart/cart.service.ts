@@ -410,10 +410,10 @@ export class CartService {
           totalCouponDiscount,
       );
     }
-
+    const taxAndShippingMessages = await this.createTaxAndShippingMessages();
     return {
       status: 200,
-      message: 'Found Cart',
+      message: ['Found Cart', ...taxAndShippingMessages],
       data: cart,
     };
   }
