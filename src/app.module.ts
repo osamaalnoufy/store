@@ -17,6 +17,7 @@ import { TaxModule } from './tax/tax.module';
 import { ReviewModule } from './review/review.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { OrderModule } from './order/order.module';
+import { AiProxyController } from './ai-proxy/ai-proxy.controller';
 dotenv.config();
 @Module({
   imports: [
@@ -51,7 +52,7 @@ dotenv.config();
     SuppliersModule,
     OrderModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AiProxyController],
   providers: [AppService],
 })
 export class AppModule {}
