@@ -44,9 +44,9 @@ export class CartController {
   @Post('coupon')
   @Roles(['user'])
   @UseGuards(UsersGuard)
-  async applyCoupon(@Body() couponName: string, @Req() req) {
+  async applyCoupon(@Body() addCoupon: { couponName: string }, @Req() req) {
     const user_id: number = req.user.id;
-    return await this.cartService.applyCoupon(user_id, couponName);
+    return await this.cartService.applyCoupon(user_id, addCoupon.couponName);
   }
 
   @Get()
