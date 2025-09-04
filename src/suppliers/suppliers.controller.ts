@@ -29,15 +29,11 @@ export class SuppliersController {
   }
 
   @Get()
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findAll() {
     return await this.suppliersService.findAll();
   }
 
   @Get(':id')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findOne(@Param('id') id: number) {
     return await this.suppliersService.findOne(id);
   }

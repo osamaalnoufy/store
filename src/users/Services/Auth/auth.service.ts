@@ -77,7 +77,7 @@ export class AuthService {
       }
       const nextId = await this.findNextAvailableId();
       const newUser = queryRunner.manager.create(Users, {
-        id: nextId, 
+        id: nextId,
         name: signUp.name,
         email: signUp.email,
         phone: signUp.phone,
@@ -266,6 +266,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: process.env.JWT_SECRET_REFRESHTOKEN,
       });
+      console.log(payload);
       if (!payload || payload.countEx <= 0) {
         throw new UnauthorizedException(
           'Invalid refresh token,please go to login again',

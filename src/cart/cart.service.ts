@@ -310,6 +310,7 @@ export class CartService {
       {
         name: coupon.name,
         couponId: coupon.id,
+        discount: coupon.discount,
       },
     ];
 

@@ -25,8 +25,6 @@ export class SubCategoryController {
     return await this.subCategoryService.createSubCategory(subCategoryDto);
   }
   @Get('find/all')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findAllSubCategory(@Body() body: { category_id: number }) {
     let categoryId = body.category_id;
     if (!categoryId) {
@@ -37,8 +35,6 @@ export class SubCategoryController {
     return await this.subCategoryService.findAllSubCategory(body.category_id);
   }
   @Get('find/:id')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findOneSubCategory(@Param('id') id: number) {
     return await this.subCategoryService.findOneSubCategory(id);
   }

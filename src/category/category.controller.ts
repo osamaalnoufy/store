@@ -61,14 +61,10 @@ export class CategoryController {
     return await this.categoryService.deleteCategory(id);
   }
   @Get('find/all')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findAllCategory() {
     return await this.categoryService.findAllCategory();
   }
   @Get('find/:id')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findOneCategory(@Param('id') id: number) {
     return await this.categoryService.findOneCategory(id);
   }

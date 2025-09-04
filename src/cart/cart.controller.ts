@@ -41,10 +41,10 @@ export class CartController {
       body.quantity,
     );
   }
-  @Post('coupon/:couponName')
+  @Post('coupon')
   @Roles(['user'])
   @UseGuards(UsersGuard)
-  async applyCoupon(@Param('couponName') couponName: string, @Req() req) {
+  async applyCoupon(@Body() couponName: string, @Req() req) {
     const user_id: number = req.user.id;
     return await this.cartService.applyCoupon(user_id, couponName);
   }

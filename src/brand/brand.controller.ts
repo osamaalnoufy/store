@@ -44,14 +44,10 @@ export class BrandController {
     );
   }
   @Get('find/all')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findAllBrand(@Body() body: { category_id: number }) {
     return await this.brandService.findAllBrand(body.category_id);
   }
   @Get('find/:id')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findOneBrand(@Param('id') id: number) {
     return await this.brandService.findOneBrand(id);
   }

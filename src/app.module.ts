@@ -18,6 +18,12 @@ import { ReviewModule } from './review/review.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { OrderModule } from './order/order.module';
 import { AiProxyController } from './ai-proxy/ai-proxy.controller';
+import { OrderStatsModule } from './order-stats/order-stats.module';
+import { CategoryStatsModule } from './category-stats/category-stats.module';
+import { TopProductsModule } from './top-products/top-products.module';
+
+import { OrderStatusModule } from './order-status/order-status.module';
+import { LowStockModule } from './low-stock/low-stock.module';
 dotenv.config();
 @Module({
   imports: [
@@ -51,6 +57,11 @@ dotenv.config();
     ReviewModule,
     SuppliersModule,
     OrderModule,
+    OrderStatsModule,
+    CategoryStatsModule,
+    TopProductsModule,
+    LowStockModule,
+    OrderStatusModule,
   ],
   controllers: [AppController, AiProxyController],
   providers: [AppService],

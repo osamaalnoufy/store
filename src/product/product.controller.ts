@@ -44,15 +44,11 @@ export class ProductController {
   }
 
   @Get('find/all')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findAllProduct(@Query() filter: ProductFilterDto) {
     return await this.productService.findAllProduct(filter);
   }
 
   @Get('find/:id')
-  @Roles(['admin', 'user'])
-  @UseGuards(UsersGuard)
   async findOneProduct(@Param('id') id: number) {
     return await this.productService.findOneProduct(id);
   }

@@ -6,7 +6,6 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { SignUp, VerifyTheEmailDto } from 'src/users/Dtos/Auth/authDto.dto';
 import { GoogleGuard } from 'src/users/Guards/google_auth.guard';
 import { LocalAuthGuardAdmin } from 'src/users/Guards/Local_auth_admin.guard';
