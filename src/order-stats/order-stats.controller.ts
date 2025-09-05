@@ -1,4 +1,3 @@
-// src/orders/order-stats.controller.ts
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { OrderStatsService } from './order-stats.service';
 import { OrderStatsResponseDto } from './dto/order-stats.dto';

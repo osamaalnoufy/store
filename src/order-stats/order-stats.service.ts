@@ -1,4 +1,3 @@
-// src/orders/order-stats.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Order } from 'src/entities/order.entity';
@@ -20,7 +19,6 @@ export class OrderStatsService {
     startDate,
     endDate,
   }: OrderStatsRequestDto): Promise<OrderStatsResponseDto[]> {
-    // تحديد الفترة الزمنية إذا لم يتم توفيرها
     let whereCondition = {};
 
     if (startDate && endDate) {
@@ -37,13 +35,11 @@ export class OrderStatsService {
       };
     }
 
-    // جلب جميع الطلبات في الفترة المحددة
     const orders = await this.orderRepository.find({
       where: whereCondition,
       order: { created_at: 'ASC' },
     });
 
-    // تجميع البيانات حسب الفترة المطلوبة
     const groupedData = this.groupOrdersByTime(orders, groupBy);
 
     return groupedData;
@@ -62,16 +58,16 @@ export class OrderStatsService {
 
       switch (groupBy) {
         case 'hour':
-          periodKey = date.toISOString().slice(0, 13) + ':00:00'; // YYYY-MM-DDTHH:00:00
+          periodKey = date.toISOString().slice(0, 13) + ':00:00';
           break;
         case 'day':
-          periodKey = date.toISOString().slice(0, 10); // YYYY-MM-DD
+          periodKey = date.toISOString().slice(0, 10);
           break;
         case 'month':
-          periodKey = date.toISOString().slice(0, 7); // YYYY-MM
+          periodKey = date.toISOString().slice(0, 7);
           break;
         case 'year':
-          periodKey = date.toISOString().slice(0, 4); // YYYY
+          periodKey = date.toISOString().slice(0, 4);
           break;
         case 'all':
         default:
@@ -87,7 +83,6 @@ export class OrderStatsService {
       groupedData[periodKey].revenue += Number(order.total_order_price);
     });
 
-    // تحويل الكائن إلى مصفوفة
     return Object.entries(groupedData).map(([period, data]) => ({
       period,
       ordersCount: data.count,
@@ -95,7 +90,6 @@ export class OrderStatsService {
     }));
   }
 
-  // دالة مساعدة للحصول على إحصائيات إضافية
   async getDashboardStats() {
     const totalOrders = await this.orderRepository.count();
     const totalRevenueResult = await this.orderRepository
@@ -104,7 +98,6 @@ export class OrderStatsService {
       .getRawOne();
     const totalRevenue = parseFloat(totalRevenueResult.total) || 0;
 
-    // الطلبات في آخر 30 يومًا
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -114,7 +107,6 @@ export class OrderStatsService {
       },
     });
 
-    // الإيرادات في آخر 30 يومًا
     const recentRevenueResult = await this.orderRepository
       .createQueryBuilder('order')
       .select('SUM(order.total_order_price)', 'total')

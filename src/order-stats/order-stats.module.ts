@@ -1,4 +1,3 @@
-// src/orders/orders.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrderStatsService } from './order-stats.service';
