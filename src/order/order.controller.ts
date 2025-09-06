@@ -62,12 +62,12 @@ export class OrderController {
   @Patch(':orderId')
   @Roles(['admin'])
   @UseGuards(UsersGuard)
-  updatePaidCash(
+  async updatePaidCash(
     @Param('orderId') orderId: number,
     @Body()
     updateOrderDto: AcceptOrderCashDto,
   ) {
-    return this.orderService.updatePaidCash(orderId, updateOrderDto);
+    return await this.orderService.updatePaidCash(orderId, updateOrderDto);
   }
 
   @Post()
