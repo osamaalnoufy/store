@@ -22,6 +22,7 @@ import { TopProductsModule } from './dashbord/top-products/top-products.module';
 import { OrderStatsModule } from './dashbord/order-stats/order-stats.module';
 import { InventoryModule } from './dashbord/low-stock/low-stock.module';
 import { ReviewsModule } from './dashbord/reviews/reviews.module';
+import { BestUserModule } from './dashbord/best-user/best-user.module';
 
 
 dotenv.config();
@@ -61,6 +62,7 @@ dotenv.config();
     TopProductsModule,
     InventoryModule,
     ReviewsModule,
+    BestUserModule,
   ],
   controllers: [AppController, AiProxyController],
   providers: [AppService],
