@@ -21,6 +21,7 @@ import { AiProxyController } from './ai-proxy/ai-proxy.controller';
 import { TopProductsModule } from './dashbord/top-products/top-products.module';
 import { OrderStatsModule } from './dashbord/order-stats/order-stats.module';
 import { InventoryModule } from './dashbord/low-stock/low-stock.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 dotenv.config();
 @Module({
@@ -58,6 +59,7 @@ dotenv.config();
     OrderStatsModule,
     TopProductsModule,
     InventoryModule,
+    ReviewsModule,
   ],
   controllers: [AppController, AiProxyController],
   providers: [AppService],
