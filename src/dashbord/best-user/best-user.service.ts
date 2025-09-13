@@ -19,11 +19,11 @@ export class BestUserService {
     const topCustomers = await this.orderRepository
       .createQueryBuilder('ord')
       .select('ord.user_id', 'userId')
-      .addSelect('usr.name', 'name') // تم تغيير الاسم هنا
+      .addSelect('usr.name', 'name') 
       .addSelect('SUM(ord.total_order_price)', 'totalSpent')
-      .innerJoin(Users, 'usr', 'ord.user_id = usr.id') // تم تغيير الاسم هنا
+      .innerJoin(Users, 'usr', 'ord.user_id = usr.id') 
       .groupBy('ord.user_id')
-      .addGroupBy('usr.name') // تم تغيير الاسم هنا
+      .addGroupBy('usr.name') 
       .orderBy('SUM(ord.total_order_price)', 'DESC')
       .limit(limit)
       .getRawMany<TopCustomerDto>();

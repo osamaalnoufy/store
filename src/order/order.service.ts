@@ -279,7 +279,7 @@ export class OrderService {
 
     switch (event.type) {
       case 'checkout.session.completed':
-        const sessionId = event.data.object.id;
+        const sessionId = (event.data.object as Stripe.Checkout.Session).id;
 
         const order = await this.orderRepository.findOne({
           where: { session_id: sessionId },
@@ -312,6 +312,20 @@ export class OrderService {
           }
           await this.cartRepository.delete({ user: { id: order.user.id } });
         }
+        break;
+
+      case 'checkout.session.expired':
+        const expiredSessionId = (event.data.object as Stripe.Checkout.Session)
+          .id;
+
+        const orderToDelete = await this.orderRepository.findOne({
+          where: { session_id: expiredSessionId },
+        });
+
+        if (orderToDelete) {
+          await this.orderRepository.remove(orderToDelete);
+        }
+        break;
     }
   }
 
