@@ -315,14 +315,25 @@ export class OrderService {
         break;
 
       case 'checkout.session.expired':
-        const expiredSessionId = (event.data.object as Stripe.Checkout.Session)
-          .id;
+        const expiredSession = event.data.object as Stripe.Checkout.Session;
+        const expiredSessionId = expiredSession.id;
 
         const orderToDelete = await this.orderRepository.findOne({
           where: { session_id: expiredSessionId },
+          relations: ['user'],
         });
 
         if (orderToDelete) {
+          const cart = await this.cartRepository.findOne({
+            where: { user: { id: orderToDelete.user.id } },
+          });
+
+          if (cart && cart.coupons && cart.coupons.length > 0) {
+            cart.coupons = [];
+
+            await this.cartRepository.save(cart);
+          }
+
           await this.orderRepository.remove(orderToDelete);
         }
         break;

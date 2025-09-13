@@ -28,7 +28,6 @@ export class Order {
   cart_items: Array<{
     productId: number;
     quantity: number;
-    color: string;
     product?: {
       id: number;
       name: string;
