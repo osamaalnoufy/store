@@ -7,6 +7,8 @@ import { Category } from 'src/entities/category.entity';
 import { Repository } from 'typeorm';
 import { SubCategory } from 'src/entities/sub-category.entity';
 import { Product } from 'src/entities/product.entity';
+import { ProductFilterAdminDto } from './dto/productFilterAdminDto.dto';
+import { ProductFilterDto } from './dto/product-filter-Dto.dto';
 
 @Injectable()
 export class ProductService {
@@ -101,11 +103,7 @@ export class ProductService {
     }
   }
 
-  async findAllProduct(filter: {
-    category: number;
-    subcategory?: number;
-    brand?: number;
-  }) {
+  async findAllProduct(filter: ProductFilterDto) {
     const categoryExists = await this.productRepository.manager
       .getRepository(Category)
       .count({ where: { id: filter.category } });
@@ -154,6 +152,57 @@ export class ProductService {
     return queryBuilder.getMany();
   }
 
+  async findAllProductsForAdmin(filter: ProductFilterAdminDto) {
+    const queryBuilder = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.subcategory', 'subcategory')
+      .leftJoinAndSelect('product.brand', 'brand');
+
+    if (filter.category) {
+      const categoryExists = await this.productRepository.manager
+        .getRepository(Category)
+        .count({ where: { id: filter.category } });
+
+      if (!categoryExists) {
+        throw new NotFoundException('الفئة الرئيسية غير موجودة');
+      }
+
+      queryBuilder.andWhere('product.category_id = :categoryId', {
+        categoryId: filter.category,
+      });
+    }
+
+    if (filter.subcategory) {
+      const subcategoryExists = await this.productRepository.manager
+        .getRepository(SubCategory)
+        .count({ where: { id: filter.subcategory } });
+
+      if (!subcategoryExists) {
+        throw new NotFoundException('الفئة الفرعية غير موجودة');
+      }
+
+      queryBuilder.andWhere('product.sub_category_id = :subcategoryId', {
+        subcategoryId: filter.subcategory,
+      });
+    }
+
+    if (filter.brand) {
+      const brandExists = await this.productRepository.manager
+        .getRepository(Brand)
+        .count({ where: { id: filter.brand } });
+
+      if (!brandExists) {
+        throw new NotFoundException('البراند غير موجود');
+      }
+
+      queryBuilder.andWhere('product.brand_id = :brandId', {
+        brandId: filter.brand,
+      });
+    }
+
+    return queryBuilder.getMany();
+  }
   async findOneProduct(id: number) {
     const product = await this.productRepository.findOne({
       where: { id },

@@ -20,6 +20,7 @@ import { UsersGuard } from 'src/users/Guards/users.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { ProductFilterDto } from './dto/product-filter-Dto.dto';
+import { ProductFilterAdminDto } from './dto/productFilterAdminDto.dto';
 
 @Controller('product')
 export class ProductController {
@@ -44,8 +45,16 @@ export class ProductController {
   }
 
   @Get('find/all')
+  @Roles(['user'])
+  @UseGuards(UsersGuard)
   async findAllProduct(@Query() filter: ProductFilterDto) {
     return await this.productService.findAllProduct(filter);
+  }
+  @Get('admin/find/all')
+  @Roles(['admin'])
+  @UseGuards(UsersGuard)
+  async findAllProductsForAdmin(@Query() filter: ProductFilterAdminDto) {
+    return await this.productService.findAllProductsForAdmin(filter);
   }
 
   @Get('find/:id')
